@@ -21,36 +21,21 @@ RUN apk add --no-cache \
 # 设置 Rust 编译优化
 ENV RUSTFLAGS="-C target-cpu=native"
 ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
-ENV CARGO_BUILD_JOBS=2
+ENV CARGO_BUILD_JOBS=4
 ENV OPENSSL_DIR=/usr
 ENV OPENSSL_LIBDIR=/usr/lib
 ENV PKG_CONFIG_PATH=/usr/lib/pkgconfig
 ENV PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig
 
-# ARMv7 特定优化
-ENV PIP_NO_BUILD_ISOLATION=1
-ENV PIP_USE_PEP517=0
-
 # 复制依赖文件
 COPY requirements.txt .
 
-# 针对不同架构的编译优化
-RUN if [ "$(uname -m)" = "armv7l" ]; then \
-        echo "ARMv7 detected, using optimized build strategy..." && \
-        # 对于 armv7，优先使用预编译包，减少编译时间
+# 预编译所有包为wheel格式，使用并行编译
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt \
+    && pip install --no-cache-dir --upgrade pip setuptools wheel \
+    || (echo "Wheel build failed, trying with pre-built packages..." && \
         pip install --no-cache-dir --only-binary=all -r requirements.txt && \
-        pip wheel --no-cache-dir --wheel-dir /wheels --only-binary=all -r requirements.txt || \
-        (echo "Pre-built packages failed, trying minimal compilation..." && \
-         # 如果预编译包失败，尝试最小化编译
-         pip install --no-cache-dir --only-binary=all python-telegram-bot==20.7 requests==2.31.0 python-dotenv==1.0.0 loguru==0.7.2 schedule==1.2.0 && \
-         pip wheel --no-cache-dir --wheel-dir /wheels --only-binary=all python-telegram-bot==20.7 requests==2.31.0 python-dotenv==1.0.0 loguru==0.7.2 schedule==1.2.0 && \
-         # 对于需要编译的包，使用更保守的策略
-         pip wheel --no-cache-dir --wheel-dir /wheels --no-deps aiohttp==3.9.1 PyGithub==2.1.1 dnspython==2.4.2); \
-    else \
-        echo "Other architecture detected, using standard build..." && \
-        pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt; \
-    fi && \
-    pip install --no-cache-dir --upgrade pip setuptools wheel
+        pip wheel --no-cache-dir --wheel-dir /wheels --only-binary=all -r requirements.txt)
 
 # 运行阶段：使用最小化镜像
 FROM python:3.11-alpine
