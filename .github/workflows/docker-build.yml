@@ -48,10 +48,8 @@ jobs:
           driver-opts: |
             image=moby/buildkit:v0.12.0
             network=host
-            # 优化构建参数，根据 GitHub Actions 资源调整
             max-parallelism=4
             max-concurrent=4
-            # 启用 BuildKit 实验性功能
             experimental=true
 
       - name: Log in to Docker Hub
@@ -88,15 +86,12 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # 优化构建参数
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             BUILDKIT_STEP_LOG_MAX_SIZE=10485760
             BUILDKIT_STEP_LOG_MAX_SPEED=10485760
-            # 根据平台调整并发数
             BUILDKIT_MAX_PARALLELISM=4
             BUILDKIT_MAX_CONCURRENT=4
-            # 启用压缩优化
             BUILDKIT_COMPRESS=1
           # 优化缓存策略
           cache-from: |
