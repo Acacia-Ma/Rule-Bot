@@ -93,14 +93,8 @@ jobs:
             BUILDKIT_MAX_CONCURRENT=4
             BUILDKIT_COMPRESS=1
           # 优化缓存策略
-          cache-from: |
-            type=gha
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cache-${{ matrix.platform }}
-          cache-to: |
-            type=gha,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cache-${{ matrix.platform }},mode=max
-          # 启用输出压缩
-          outputs: type=image,compression=gzip,compression-level=6
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # 添加构建完成通知（可选）
       - name: Build Summary

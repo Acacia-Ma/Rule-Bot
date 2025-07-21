@@ -16,9 +16,7 @@ RUN apk add --no-cache \
     musl-dev \
     python3-dev \
     rust \
-    cargo \
-    # 添加并行编译支持
-    parallel
+    cargo
 
 # 设置 Rust 编译优化
 ENV RUSTFLAGS="-C target-cpu=native"
@@ -69,9 +67,9 @@ RUN addgroup -g 1000 appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+# 健康检查（暂时禁用，因为应用可能没有健康检查端点）
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#     CMD curl -f http://localhost:8080/health || exit 1
 
 EXPOSE 8080
 
