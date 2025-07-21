@@ -148,7 +148,7 @@ class HandlerManager:
             welcome_text = f"""
 👋 欢迎使用 Rule-Bot，{username}！
 
-🤖 我是一个专门管理OpenClash规则的机器人，可以帮助您：
+🤖 我是一个专门管理Clash规则的机器人，可以帮助您：
 
 📂 *目标仓库：* `{self.config.GITHUB_REPO}`
 
@@ -346,7 +346,7 @@ class HandlerManager:
         welcome_text = f"""
 👋 欢迎使用 Rule-Bot，{username}！
 
-🤖 我是一个专门管理OpenClash规则的机器人，可以帮助您：
+🤖 我是一个专门管理Clash规则的机器人，可以帮助您：
 
 📂 *目标仓库：* `{self.config.GITHUB_REPO}`
 
@@ -382,7 +382,7 @@ class HandlerManager:
         welcome_text = f"""
 👋 欢迎使用 Rule-Bot，{username}！
 
-🤖 我是一个专门管理OpenClash规则的机器人，可以帮助您：
+🤖 我是一个专门管理Clash规则的机器人，可以帮助您：
 
 📂 *目标仓库：* `{self.config.GITHUB_REPO}`
 
