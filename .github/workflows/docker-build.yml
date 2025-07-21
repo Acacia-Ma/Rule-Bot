@@ -34,12 +34,12 @@ jobs:
     # 添加策略配置，优化并发
     strategy:
       matrix:
-        # 支持完整架构覆盖
-        platform: [linux/amd64, linux/arm64, linux/arm/v7, linux/386]
+        # 支持主要架构覆盖（移除 ARMv7）
+        platform: [linux/amd64, linux/arm64, linux/386]
       # 失败时快速失败
       fail-fast: false
       # 最大并发数，根据 GitHub Actions 限制调整
-      max-parallel: 4
+      max-parallel: 3
 
     steps:
       - name: Checkout repository
