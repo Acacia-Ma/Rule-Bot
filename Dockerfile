@@ -59,13 +59,17 @@ FROM python:3.11-alpine
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_NO_CACHE_DIR=1
+ENV TZ=Asia/Shanghai
 
 # 安装运行时依赖（最小化）
 RUN apk add --no-cache \
     curl \
     ca-certificates \
+    tzdata \
     && rm -rf /var/cache/apk/* \
-    && update-ca-certificates
+    && update-ca-certificates \
+    && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone
 
 WORKDIR /app
 
