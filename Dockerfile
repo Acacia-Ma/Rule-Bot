@@ -21,16 +21,21 @@ RUN apk add --no-cache \
 # 设置 Rust 编译优化
 ENV RUSTFLAGS="-C target-cpu=native"
 ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
-ENV CARGO_BUILD_JOBS=2
+ENV CARGO_BUILD_JOBS=4
 ENV OPENSSL_DIR=/usr
 ENV OPENSSL_LIBDIR=/usr/lib
+ENV PKG_CONFIG_PATH=/usr/lib/pkgconfig
+ENV PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig
 
 # 复制依赖文件
 COPY requirements.txt .
 
 # 预编译所有包为wheel格式，使用并行编译
 RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt \
-    && pip install --no-cache-dir --upgrade pip setuptools wheel
+    && pip install --no-cache-dir --upgrade pip setuptools wheel \
+    || (echo "Wheel build failed, trying with pre-built packages..." && \
+        pip install --no-cache-dir --only-binary=all -r requirements.txt && \
+        pip wheel --no-cache-dir --wheel-dir /wheels --only-binary=all -r requirements.txt)
 
 # 运行阶段：使用最小化镜像
 FROM python:3.11-alpine
