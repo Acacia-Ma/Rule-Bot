@@ -93,6 +93,8 @@ jobs:
           # 临时禁用缓存，避免 GitHub Actions 缓存服务问题
           # cache-from: type=gha
           # cache-to: type=gha,mode=max
+          # 确保多架构 manifest 正确创建
+          provenance: false
 
       # 添加构建完成通知（可选）
       - name: Build Summary
@@ -107,6 +109,20 @@ jobs:
         if: matrix.platform == 'linux/amd64'
         run: |
           echo "Waiting for all architectures to complete..."
-          sleep 30
+          sleep 60
           echo "Verifying manifest for ${{ steps.meta.outputs.tags }}"
-          docker manifest inspect ${{ steps.meta.outputs.tags }} || echo "Manifest not ready yet"
+          
+          # 检查 manifest 是否包含所有架构
+          MANIFEST_OUTPUT=$(docker manifest inspect ${{ steps.meta.outputs.tags }} 2>/dev/null || echo "{}")
+          echo "Manifest content: $MANIFEST_OUTPUT"
+          
+          # 检查架构数量
+          ARCH_COUNT=$(echo "$MANIFEST_OUTPUT" | grep -o '"architecture"' | wc -l)
+          echo "Found $ARCH_COUNT architectures in manifest"
+          
+          if [ "$ARCH_COUNT" -lt 3 ]; then
+            echo "Warning: Not all architectures found in manifest"
+            echo "This might indicate a push or merge issue"
+          else
+            echo "Success: All architectures found in manifest"
+          fi
