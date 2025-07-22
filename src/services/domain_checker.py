@@ -56,13 +56,13 @@ class DomainChecker:
                     location = self.geoip_service.get_location_info(ip)
                     if location["is_china"]:
                         china_ips.append(ip)
-                    result["details"].append(f"域名IP {ip}: {location['country_name']}")
+                    result["details"].append(f"域名 IP {ip}: {location['country_name']}")
                 
                 result["domain_china_status"] = len(china_ips) > 0
                 if china_ips:
-                    result["details"].append(f"域名有 {len(china_ips)} 个中国IP")
+                    result["details"].append(f"域名有 {len(china_ips)} 个中国 IP")
             else:
-                result["details"].append("无法解析域名IP")
+                result["details"].append("无法解析域名 IP")
             
             # 2. 如果不是二级域名，查询二级域名IP
             if second_level and second_level != normalized_domain:
@@ -76,13 +76,13 @@ class DomainChecker:
                         location = self.geoip_service.get_location_info(ip)
                         if location["is_china"]:
                             china_ips.append(ip)
-                        result["details"].append(f"二级域名IP {ip}: {location['country_name']}")
+                        result["details"].append(f"二级域名 IP {ip}: {location['country_name']}")
                     
                     result["second_level_china_status"] = len(china_ips) > 0
                     if china_ips:
-                        result["details"].append(f"二级域名有 {len(china_ips)} 个中国IP")
+                        result["details"].append(f"二级域名有 {len(china_ips)} 个中国 IP")
                 else:
-                    result["details"].append("无法解析二级域名IP")
+                    result["details"].append("无法解析二级域名 IP")
             
             # 3. 查询NS服务器
             ns_domain = second_level if second_level else normalized_domain
@@ -116,20 +116,20 @@ class DomainChecker:
                 # 生成简洁的NS摘要信息
                 if china_ns_count > 0:
                     result["ns_china_status"] = True
-                    result["details"].append(f"NS服务器: {china_ns_count}/{total_ns_count} 个IP在中国大陆")
+                    result["details"].append(f"NS 服务器: {china_ns_count}/{total_ns_count} 个 IP 在中国大陆")
                 else:
-                    result["details"].append(f"NS服务器: 0/{total_ns_count} 个IP在中国大陆")
+                    result["details"].append(f"NS 服务器: 0/{total_ns_count} 个 IP 在中国大陆")
                 
                 # 添加详细的NS服务器信息（简化显示）
                 for ns, summary in ns_summary.items():
                     china_count = summary["china"]
                     foreign_count = summary["foreign"]
                     if china_count > 0:
-                        result["details"].append(f"  • {ns}: {china_count}个中国IP + {foreign_count}个海外IP")
+                        result["details"].append(f"  • {ns}: {china_count} 个中国 IP + {foreign_count} 个海外 IP")
                     else:
-                        result["details"].append(f"  • {ns}: {foreign_count}个海外IP")
+                        result["details"].append(f"  • {ns}: {foreign_count} 个海外 IP")
             else:
-                result["details"].append("无法查询到NS记录")
+                result["details"].append("无法查询到 NS 记录")
             
             # 生成建议
             result["recommendation"] = self._generate_recommendation(result)

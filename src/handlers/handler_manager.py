@@ -148,7 +148,7 @@ class HandlerManager:
             welcome_text = f"""
 👋 欢迎使用 Rule-Bot，{username}！
 
-🤖 我是一个专门管理Clash规则的机器人，可以帮助您：
+🤖 我是一个专门管理 Clash 规则的机器人，可以帮助您：
 
 📂 *目标仓库：* `{self.config.GITHUB_REPO}`
 
@@ -159,8 +159,8 @@ class HandlerManager:
 
 🎯 *支持的操作：*
 • 检查域名是否已在规则中
-• 检查域名是否在GEOSITE:CN中
-• DNS解析和IP归属地检查
+• 检查域名是否在 GEOSITE:CN 中
+• DNS 解析和 IP 归属地检查
 • 自动判断添加建议
 
 请选择您要执行的操作：
@@ -195,12 +195,12 @@ class HandlerManager:
 
 🔍 *查询域名功能：*
 • 检查域名是否在直连规则中
-• 检查域名是否在GEOSITE:CN中
-• 显示域名的IP归属地信息
+• 检查域名是否在 GEOSITE:CN 中
+• 显示域名的 IP 归属地信息
 
 ➕ *添加直连规则功能：*
-• 自动检查域名IP归属地
-• 检查NS服务器归属地
+• 自动检查域名 IP 归属地
+• 检查 NS 服务器归属地
 • 根据检查结果自动判断是否适合添加
 • 支持添加说明信息
 
@@ -213,12 +213,12 @@ class HandlerManager:
 ⚠️ *注意事项：*
 • 代理规则添加功能暂不支持
 • 删除规则功能暂不支持
-• 域名检查基于DoH和GeoIP数据
+• 域名检查基于 DoH 和 GeoIP 数据
 
 🛠 *技术特性：*
-• 使用中国境内EDNS查询
-• 支持阿里云和腾讯云DoH
-• 自动更新GeoIP和GeoSite数据
+• 使用中国境内 EDNS 查询
+• 支持阿里云和腾讯云 DoH
+• 自动更新 GeoIP 和 GeoSite 数据
 """
         
         keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]
@@ -240,7 +240,7 @@ class HandlerManager:
             # 获取GeoSite域名数量
             geosite_count = len(self.data_manager.geosite_domains)
             
-            stats_text = f"📊 *当前统计：*\n• 直连规则数量：{direct_rule_count}\n• GEOSITE:CN域名数量：{geosite_count:,}\n\n"
+            stats_text = f"📊 *当前统计：*\n• 直连规则数量：{direct_rule_count}\n• GEOSITE:CN 域名数量：{geosite_count:,}\n\n"
         except Exception as e:
             logger.error(f"获取统计信息失败: {e}")
             stats_text = "📊 *统计信息加载中...*\n\n"
@@ -454,7 +454,7 @@ class HandlerManager:
             # 获取GeoSite域名数量
             geosite_count = len(self.data_manager.geosite_domains)
             
-            stats_text = f"📊 *当前统计：*\n• 直连规则数量：{direct_rule_count}\n• GEOSITE:CN域名数量：{geosite_count:,}\n\n"
+            stats_text = f"📊 *当前统计：*\n• 直连规则数量：{direct_rule_count}\n• GEOSITE:CN 域名数量：{geosite_count:,}\n\n"
             
             # 添加用户限制信息
             if can_add:
@@ -508,12 +508,12 @@ class HandlerManager:
 
 🔍 *查询域名功能：*
 • 检查域名是否在直连规则中
-• 检查域名是否在GEOSITE:CN中
-• 显示域名的IP归属地信息
+• 检查域名是否在 GEOSITE:CN 中
+• 显示域名的 IP 归属地信息
 
 ➕ *添加直连规则功能：*
-• 自动检查域名IP归属地
-• 检查NS服务器归属地
+• 自动检查域名 IP 归属地
+• 检查 NS 服务器归属地
 • 根据检查结果自动判断是否适合添加
 • 支持添加说明信息
 
@@ -526,7 +526,7 @@ class HandlerManager:
 ⚠️ *注意事项：*
 • 代理规则添加功能暂不支持
 • 删除规则功能暂不支持
-• 域名检查基于DoH和GeoIP数据
+• 域名检查基于 DoH 和 GeoIP 数据
 """
         
         keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]
@@ -592,9 +592,9 @@ class HandlerManager:
             # 2. 检查是否在GeoSite中
             in_geosite = await self.data_manager.is_domain_in_geosite(domain)
             if in_geosite:
-                result_text += "✅ *GEOSITE:CN状态：* 已存在\n"
+                result_text += "✅ *GEOSITE:CN 状态：* 已存在\n"
             else:
-                result_text += "❌ *GEOSITE:CN状态：* 不存在\n"
+                result_text += "❌ *GEOSITE:CN 状态：* 不存在\n"
             
             # 3. 进行综合域名检查
             await processing_msg.edit_text("🔍 正在检查域名IP和NS信息...")
@@ -607,13 +607,13 @@ class HandlerManager:
                 
                 # 显示IP信息
                 if check_result["domain_ips"]:
-                    result_text += f"   • 域名IP: {', '.join(check_result['domain_ips'])}\n"
+                    result_text += f"   • 域名 IP: {', '.join(check_result['domain_ips'])}\n"
                 if check_result["second_level_ips"]:
-                    result_text += f"   • 二级域名IP: {', '.join(check_result['second_level_ips'])}\n"
+                    result_text += f"   • 二级域名 IP: {', '.join(check_result['second_level_ips'])}\n"
                 
                 # 显示详细信息
                 if check_result["details"]:
-                    result_text += "\n🌍 *IP归属地信息：*\n"
+                    result_text += "\n🌍 *IP 归属地信息：*\n"
                     for detail in check_result["details"][:5]:  # 限制显示数量
                         result_text += f"   • {detail}\n"
                 
