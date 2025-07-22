@@ -182,19 +182,33 @@ jobs:
           # 获取镜像标签
           TAGS="${{ needs.build-amd64.outputs.tags }}"
           
-          # 为每个架构创建标签
+          # 为每个架构创建标签并推送
           for tag in $TAGS; do
+            echo "Processing tag: $tag"
+            
             # 为 amd64 架构创建标签
             docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64 $tag-amd64
             
             # 为 arm64 架构创建标签
             docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64 $tag-arm64
             
+            # 先推送各个架构的镜像
+            echo "Pushing amd64 image for tag: $tag"
+            docker push $tag-amd64
+            
+            echo "Pushing arm64 image for tag: $tag"
+            docker push $tag-arm64
+            
             # 创建多架构 manifest
+            echo "Creating multi-arch manifest for tag: $tag"
             docker manifest create $tag $tag-amd64 $tag-arm64
             
             # 推送到 Docker Hub
+            echo "Pushing multi-arch manifest for tag: $tag"
             docker manifest push $tag
+            
+            # 清理本地标签
+            docker rmi $tag-amd64 $tag-arm64
           done
 
       - name: Verify multi-arch manifest
