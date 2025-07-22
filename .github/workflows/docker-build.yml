@@ -164,6 +164,8 @@ jobs:
         run: |
           docker load --input /tmp/amd64.tar
           docker load --input /tmp/arm64.tar
+          echo "Available images after loading:"
+          docker images
 
       - name: Debug information
         run: |
@@ -188,22 +190,28 @@ jobs:
           for tag in $TAGS; do
             echo "Processing tag: $tag"
             
-            # 检查镜像是否存在
-            if ! docker images | grep -q "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64"; then
+            # 查找加载的镜像
+            AMD64_IMAGE=$(docker images --format "table {{.Repository}}:{{.Tag}}" | grep "aethersailor/rule-bot" | grep "amd64" | head -1)
+            ARM64_IMAGE=$(docker images --format "table {{.Repository}}:{{.Tag}}" | grep "aethersailor/rule-bot" | grep "arm64" | head -1)
+            
+            echo "Found amd64 image: $AMD64_IMAGE"
+            echo "Found arm64 image: $ARM64_IMAGE"
+            
+            if [ -z "$AMD64_IMAGE" ]; then
               echo "Error: amd64 image not found!"
               exit 1
             fi
             
-            if ! docker images | grep -q "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64"; then
+            if [ -z "$ARM64_IMAGE" ]; then
               echo "Error: arm64 image not found!"
               exit 1
             fi
             
             # 为 amd64 架构创建标签
-            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64 $tag-amd64
+            docker tag $AMD64_IMAGE $tag-amd64
             
             # 为 arm64 架构创建标签
-            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64 $tag-arm64
+            docker tag $ARM64_IMAGE $tag-arm64
             
             # 先推送各个架构的镜像
             echo "Pushing amd64 image for tag: $tag"
