@@ -85,7 +85,7 @@ jobs:
             BUILDKIT_STEP_LOG_MAX_SPEED=10485760
           provenance: false
 
-      - name: Upload amd64 artifact
+      - name: Upload amd64 image
         uses: actions/upload-artifact@v4
         with:
           name: amd64-image
@@ -131,7 +131,7 @@ jobs:
             BUILDKIT_STEP_LOG_MAX_SPEED=10485760
           provenance: false
 
-      - name: Upload arm64 artifact
+      - name: Upload arm64 image
         uses: actions/upload-artifact@v4
         with:
           name: arm64-image
