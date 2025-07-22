@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   rule-bot:
     build: .
@@ -20,7 +18,7 @@ services:
       - DIRECT_RULE_FILE=your_direct_rule_file_path
       
       # 代理规则文件路径 (可选，暂不使用)
-      - PROXY_RULE_FILE=your_proxy_rule_file_path
+      # - PROXY_RULE_FILE=your_proxy_rule_file_path
       # ========================================
       
       # ========== 可选配置项 ==========
@@ -42,6 +40,4 @@ services:
       # 时区设置 (设置为北京时间)
       - TZ=Asia/Shanghai
       # ========================================
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs 
+ 

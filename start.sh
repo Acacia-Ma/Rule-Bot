@@ -1,9 +1,4 @@
-#!/bin/bash
-
-# Create data directories if they don't exist
-mkdir -p /app/data/geoip
-mkdir -p /app/data/geosite
-mkdir -p /app/logs
+#!/bin/sh
 
 # Start the application
 cd /app

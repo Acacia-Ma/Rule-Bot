@@ -111,7 +111,7 @@ class GitHubService:
             for line_num, line in enumerate(lines, 1):
                 line = line.strip()
                 if line and not line.startswith('#'):
-                    # 检查DOMAIN-SUFFIX格式
+                    # 检查 DOMAIN-SUFFIX 格式
                     if line.startswith('DOMAIN-SUFFIX,'):
                         rule_domain = line[14:].strip().lower()
                         if rule_domain == domain_lower:
@@ -212,7 +212,7 @@ class GitHubService:
             file_content = self.repo.get_contents(file_path)
             logger.debug(f"获取到文件对象，准备更新文件")
             
-            # 构造完整的commit消息（标题 + 描述）
+            # 构造完整的 commit 消息（标题 + 描述）
             full_commit_message = commit_title
             if commit_body.strip():
                 full_commit_message += f"\n\n{commit_body}"
@@ -228,7 +228,7 @@ class GitHubService:
                 )
             )
             
-            # 构建commit链接
+            # 构建 commit 链接
             commit_sha = commit_result['commit'].sha
             commit_url = f"https://github.com/{self.config.GITHUB_REPO}/commit/{commit_sha}"
             
@@ -318,7 +318,7 @@ class GitHubService:
                 )
             )
             
-            # 构建commit链接
+            # 构建 commit 链接
             commit_sha = commit_result['commit'].sha
             commit_url = f"https://github.com/{self.config.GITHUB_REPO}/commit/{commit_sha}"
             

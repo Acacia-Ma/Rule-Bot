@@ -22,7 +22,7 @@ class Config:
         
         # 规则文件配置
         self.DIRECT_RULE_FILE = self._get_env_required("DIRECT_RULE_FILE")
-        self.PROXY_RULE_FILE = self._get_env_required("PROXY_RULE_FILE")  # 备用
+        self.PROXY_RULE_FILE = os.getenv("PROXY_RULE_FILE", "")  # 可选，暂未启用
         
         # 日志配置
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

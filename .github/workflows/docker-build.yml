@@ -17,7 +17,8 @@ on:
 
 # 添加并发控制，避免重复构建
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # 按分支分组，同分支的新构建会取消旧构建
+  group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -25,27 +26,17 @@ env:
   IMAGE_NAME: aethersailor/rule-bot
 
 jobs:
-  build:
+  # 构建并推送多架构镜像
+  build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
 
-    # 添加策略配置，优化并发
-    strategy:
-      matrix:
-        # 支持主要架构覆盖（移除 ARMv7）
-        platform: [linux/amd64, linux/arm64, linux/386]
-      # 失败时快速失败
-      fail-fast: false
-      # 最大并发数，根据 GitHub Actions 限制调整
-      max-parallel: 3
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # 启用浅克隆，减少下载时间
           fetch-depth: 1
 
       - name: Set up Docker Buildx
@@ -77,11 +68,11 @@ jobs:
             org.opencontainers.image.description=Telegram bot for rule management
             org.opencontainers.image.vendor=AetherSailor
 
-      - name: Build and push Docker image
+      - name: Build and push multi-arch image
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -89,14 +80,44 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
             BUILDKIT_STEP_LOG_MAX_SIZE=10485760
             BUILDKIT_STEP_LOG_MAX_SPEED=10485760
-          # 临时禁用缓存，避免 GitHub Actions 缓存服务问题
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=max
+          provenance: false
 
-      # 添加构建完成通知（可选）
-      - name: Build Summary
-        if: always()
+      - name: Verify multi-arch manifest
         run: |
-          echo "Build completed for platform: ${{ matrix.platform }}"
-          echo "Event: ${{ github.event_name }}"
-          echo "Ref: ${{ github.ref }}"
+          TAGS="${{ steps.meta.outputs.tags }}"
+          for tag in $TAGS; do
+            echo "Verifying manifest for $tag"
+            
+            # 等待 manifest 创建完成
+            sleep 30
+            
+            # 检查 manifest 是否包含所有架构
+            MANIFEST_OUTPUT=$(docker manifest inspect $tag 2>/dev/null || echo "{}")
+            echo "Manifest content: $MANIFEST_OUTPUT"
+            
+            # 检查架构数量
+            ARCH_COUNT=$(echo "$MANIFEST_OUTPUT" | grep -o '"architecture"' | wc -l)
+            echo "Found $ARCH_COUNT architectures in manifest"
+            
+            # 检查具体架构
+            echo "Checking specific architectures..."
+            if echo "$MANIFEST_OUTPUT" | grep -q '"architecture": "amd64"'; then
+              echo "✅ amd64 architecture found"
+            else
+              echo "❌ amd64 architecture missing"
+            fi
+            
+            if echo "$MANIFEST_OUTPUT" | grep -q '"architecture": "arm64"'; then
+              echo "✅ arm64 architecture found"
+            else
+              echo "❌ arm64 architecture missing"
+            fi
+            
+            if [ "$ARCH_COUNT" -lt 2 ]; then
+              echo "Warning: Not all architectures found in manifest"
+              echo "This might indicate a push or merge issue"
+              exit 1
+            else
+              echo "Success: All architectures found in manifest"
+            fi
+          done
