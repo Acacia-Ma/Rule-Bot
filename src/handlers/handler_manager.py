@@ -110,8 +110,8 @@ class HandlerManager:
         if not text:
             return text
         
-        # 转义特殊字符
-        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        # 转义特殊字符（不包含点号，因为域名和文件路径中需要保留）
+        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '!']
         for char in special_chars:
             text = text.replace(char, f'\\{char}')
         
