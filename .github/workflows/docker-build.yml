@@ -32,15 +32,8 @@ jobs:
       contents: read
       packages: write
 
-    # 添加策略配置，优化并发
-    strategy:
-      matrix:
-        # 支持主要架构覆盖（移除 ARMv7）
-        platform: [linux/amd64, linux/arm64, linux/386]
-      # 失败时快速失败
-      fail-fast: false
-      # 最大并发数，根据 GitHub Actions 限制调整
-      max-parallel: 3
+    # 移除矩阵策略，改为单次构建所有架构
+    # 这样可以确保多架构 manifest 正确创建
 
     steps:
       - name: Checkout repository
@@ -82,7 +75,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64,linux/arm64,linux/386
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -96,21 +89,21 @@ jobs:
           # 确保多架构 manifest 正确创建
           provenance: false
 
-      # 添加构建完成通知（可选）
+      # 添加构建完成通知
       - name: Build Summary
         if: always()
         run: |
-          echo "Build completed for platform: ${{ matrix.platform }}"
+          echo "Build completed for all platforms"
           echo "Event: ${{ github.event_name }}"
           echo "Ref: ${{ github.ref }}"
           
-      # 验证所有架构构建完成
-      - name: Verify all architectures
-        if: matrix.platform == 'linux/amd64'
+      # 验证多架构 manifest 创建
+      - name: Verify multi-arch manifest
         run: |
-          echo "Waiting for all architectures to complete..."
-          sleep 60
           echo "Verifying manifest for ${{ steps.meta.outputs.tags }}"
+          
+          # 等待 manifest 创建完成
+          sleep 30
           
           # 检查 manifest 是否包含所有架构
           MANIFEST_OUTPUT=$(docker manifest inspect ${{ steps.meta.outputs.tags }} 2>/dev/null || echo "{}")
@@ -120,9 +113,30 @@ jobs:
           ARCH_COUNT=$(echo "$MANIFEST_OUTPUT" | grep -o '"architecture"' | wc -l)
           echo "Found $ARCH_COUNT architectures in manifest"
           
+          # 检查具体架构
+          echo "Checking specific architectures..."
+          if echo "$MANIFEST_OUTPUT" | grep -q '"architecture": "amd64"'; then
+            echo "✅ amd64 architecture found"
+          else
+            echo "❌ amd64 architecture missing"
+          fi
+          
+          if echo "$MANIFEST_OUTPUT" | grep -q '"architecture": "arm64"'; then
+            echo "✅ arm64 architecture found"
+          else
+            echo "❌ arm64 architecture missing"
+          fi
+          
+          if echo "$MANIFEST_OUTPUT" | grep -q '"architecture": "386"'; then
+            echo "✅ 386 architecture found"
+          else
+            echo "❌ 386 architecture missing"
+          fi
+          
           if [ "$ARCH_COUNT" -lt 3 ]; then
             echo "Warning: Not all architectures found in manifest"
             echo "This might indicate a push or merge issue"
+            exit 1
           else
             echo "Success: All architectures found in manifest"
           fi
