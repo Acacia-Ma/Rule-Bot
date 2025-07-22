@@ -75,7 +75,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64,linux/386
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -127,13 +127,7 @@ jobs:
             echo "❌ arm64 architecture missing"
           fi
           
-          if echo "$MANIFEST_OUTPUT" | grep -q '"architecture": "386"'; then
-            echo "✅ 386 architecture found"
-          else
-            echo "❌ 386 architecture missing"
-          fi
-          
-          if [ "$ARCH_COUNT" -lt 3 ]; then
+          if [ "$ARCH_COUNT" -lt 2 ]; then
             echo "Warning: Not all architectures found in manifest"
             echo "This might indicate a push or merge issue"
             exit 1
