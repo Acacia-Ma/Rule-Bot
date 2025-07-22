@@ -16,10 +16,10 @@ on:
       - '*.md'
 
 # 添加并发控制，避免重复构建
-# 注意：这可能导致架构构建不完整，暂时注释掉
-# concurrency:
-#   group: ${{ github.workflow }}-${{ github.ref }}
-#   cancel-in-progress: true
+concurrency:
+  # 按分支分组，同分支的新构建会取消旧构建
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: docker.io
