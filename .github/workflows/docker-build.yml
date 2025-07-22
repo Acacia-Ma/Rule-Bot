@@ -96,7 +96,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
 
     steps:
       - name: Checkout repository
@@ -110,13 +109,6 @@ jobs:
           driver-opts: |
             image=moby/buildkit:v0.12.0
             network=host
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build arm64 image
         uses: docker/build-push-action@v5
@@ -177,14 +169,39 @@ jobs:
           docker load --input /tmp/amd64.tar
           docker load --input /tmp/arm64.tar
 
+      - name: Debug information
+        run: |
+          echo "Available images:"
+          docker images
+          echo ""
+          echo "Tags from build-amd64: ${{ needs.build-amd64.outputs.tags }}"
+          echo "Image name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+
       - name: Create and push multi-arch manifest
         run: |
           # 获取镜像标签
           TAGS="${{ needs.build-amd64.outputs.tags }}"
+          echo "Processing tags: $TAGS"
+          
+          if [ -z "$TAGS" ]; then
+            echo "Error: No tags found!"
+            exit 1
+          fi
           
           # 为每个架构创建标签并推送
           for tag in $TAGS; do
             echo "Processing tag: $tag"
+            
+            # 检查镜像是否存在
+            if ! docker images | grep -q "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64"; then
+              echo "Error: amd64 image not found!"
+              exit 1
+            fi
+            
+            if ! docker images | grep -q "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64"; then
+              echo "Error: arm64 image not found!"
+              exit 1
+            fi
             
             # 为 amd64 架构创建标签
             docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64 $tag-amd64
