@@ -4,7 +4,7 @@ FROM python:3.11-alpine AS builder
 # 设置构建参数
 ARG BUILDKIT_INLINE_CACHE=1
 
-# 安装编译依赖（包括 Rust 编译器）
+# 安装编译依赖（包括 Rust 编译器和 PyInstaller 依赖）
 RUN apk add --no-cache \
     gcc \
     g++ \
@@ -16,7 +16,8 @@ RUN apk add --no-cache \
     rust \
     cargo \
     openssl-dev \
-    pkgconfig
+    pkgconfig \
+    upx
 
 # 设置 Rust 编译优化
 ENV RUSTFLAGS="-C target-cpu=native"
@@ -37,13 +38,25 @@ RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt \
         pip install --no-cache-dir --only-binary=all -r requirements.txt && \
         pip wheel --no-cache-dir --wheel-dir /wheels --only-binary=all -r requirements.txt)
 
+# 安装预编译的包
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+
+# 复制应用源码
+COPY src/ ./src/
+COPY rule-bot.spec .
+
+# 使用 PyInstaller 打包应用（不包含源码）
+RUN pyinstaller --clean rule-bot.spec && \
+    rm -rf src/ && \
+    rm -rf build/ && \
+    rm -rf __pycache__/ && \
+    rm -f rule-bot.spec
+
 # 运行阶段：使用最小化镜像
-FROM python:3.11-alpine
+FROM alpine:latest
 
 # 设置运行时环境变量
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PIP_NO_CACHE_DIR=1
 ENV TZ=Asia/Shanghai
 
 # 安装运行时依赖（最小化）
@@ -58,20 +71,10 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# 从编译阶段复制预编译的wheel包
-COPY --from=builder /wheels /wheels
-
-# 安装预编译的包（避免编译）
-RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
-
-# 复制应用代码并编译为字节码
-COPY src/ ./src/
+# 从编译阶段复制打包后的可执行文件
+COPY --from=builder /dist/rule-bot /app/rule-bot
 COPY start.sh .
-
-# 编译所有 Python 文件为字节码，删除源码
-RUN python -m compileall -b src/ && \
-    find src/ -name "*.py" -delete && \
-    chmod +x start.sh
+RUN chmod +x start.sh /app/rule-bot
 
 # 创建必要目录
 RUN mkdir -p /app/data /app/logs
@@ -81,10 +84,6 @@ RUN addgroup -g 1000 appuser && \
     adduser -D -s /bin/sh -u 1000 -G appuser appuser && \
     chown -R appuser:appuser /app
 USER appuser
-
-# 健康检查（暂时禁用，因为应用可能没有健康检查端点）
-# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-#     CMD curl -f http://localhost:8080/health || exit 1
 
 EXPOSE 8080
 

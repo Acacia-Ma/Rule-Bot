@@ -5,6 +5,6 @@ mkdir -p /app/data/geoip
 mkdir -p /app/data/geosite
 mkdir -p /app/logs
 
-# Start the application
+# Start the application (using bytecode)
 cd /app
-./rule-bot 
+python -m src.main 
