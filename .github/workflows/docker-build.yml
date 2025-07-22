@@ -169,9 +169,6 @@ jobs:
           echo "Available images after loading:"
           docker images
           echo ""
-          echo "Images with aethersailor/rule-bot:"
-          docker images | grep "aethersailor/rule-bot"
-          echo ""
           echo "All images with platform info:"
           docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}\t{{.Size}}"
 
@@ -179,6 +176,9 @@ jobs:
         run: |
           echo "Available images:"
           docker images
+          echo ""
+          echo "Dangling images (our loaded images):"
+          docker images --filter "dangling=true"
           echo ""
           echo "Tags from build-amd64: ${{ needs.build-amd64.outputs.tags }}"
           echo "Image name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
@@ -194,70 +194,76 @@ jobs:
             exit 1
           fi
           
+          # 获取加载的镜像ID（排除buildkit镜像）
+          IMAGE_IDS=$(docker images --format "{{.ID}}" --filter "dangling=true")
+          echo "Found dangling images: $IMAGE_IDS"
+          
+          AMD64_ID=""
+          ARM64_ID=""
+          
+          # 检查每个镜像的架构
+          for img_id in $IMAGE_IDS; do
+            echo "Inspecting image: $img_id"
+            ARCH=$(docker inspect $img_id --format='{{.Architecture}}' 2>/dev/null || echo "unknown")
+            echo "Image $img_id has architecture: $ARCH"
+            
+            if [ "$ARCH" = "amd64" ]; then
+              AMD64_ID=$img_id
+              echo "Found amd64 image: $img_id"
+            elif [ "$ARCH" = "arm64" ]; then
+              ARM64_ID=$img_id
+              echo "Found arm64 image: $img_id"
+            fi
+          done
+          
+          echo "Final amd64 image ID: $AMD64_ID"
+          echo "Final arm64 image ID: $ARM64_ID"
+          
+          if [ -z "$AMD64_ID" ]; then
+            echo "Error: amd64 image not found!"
+            exit 1
+          fi
+          
+          if [ -z "$ARM64_ID" ]; then
+            echo "Error: arm64 image not found!"
+            exit 1
+          fi
+          
           # 为每个架构创建标签并推送
           for tag in $TAGS; do
             echo "Processing tag: $tag"
             
-            # 查找加载的镜像 - 使用架构信息来正确识别
-            echo "Checking image architectures..."
+            # 使用临时标签推送各个架构的镜像
+            TEMP_AMD64_TAG="${tag}-temp-amd64-$(date +%s)"
+            TEMP_ARM64_TAG="${tag}-temp-arm64-$(date +%s)"
             
-            # 获取所有镜像的详细信息
-            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Digest}}" | grep "aethersailor/rule-bot"
+            # 为 amd64 架构创建临时标签
+            docker tag $AMD64_ID $TEMP_AMD64_TAG
             
-            # 使用 docker inspect 来获取架构信息
-            IMAGE_IDS=$(docker images --format "{{.ID}}" | grep -v "<none>")
-            AMD64_ID=""
-            ARM64_ID=""
+            # 为 arm64 架构创建临时标签
+            docker tag $ARM64_ID $TEMP_ARM64_TAG
             
-            for img_id in $IMAGE_IDS; do
-              ARCH=$(docker inspect $img_id --format='{{.Architecture}}')
-              echo "Image $img_id has architecture: $ARCH"
-              
-              if [ "$ARCH" = "amd64" ]; then
-                AMD64_ID=$img_id
-                echo "Found amd64 image: $img_id"
-              elif [ "$ARCH" = "arm64" ]; then
-                ARM64_ID=$img_id
-                echo "Found arm64 image: $img_id"
-              fi
-            done
+            # 推送各个架构的镜像到Docker Hub
+            echo "Pushing amd64 image with temporary tag: $TEMP_AMD64_TAG"
+            docker push $TEMP_AMD64_TAG
             
-            echo "Final amd64 image ID: $AMD64_ID"
-            echo "Final arm64 image ID: $ARM64_ID"
-            
-            if [ -z "$AMD64_ID" ]; then
-              echo "Error: amd64 image not found!"
-              exit 1
-            fi
-            
-            if [ -z "$ARM64_ID" ]; then
-              echo "Error: arm64 image not found!"
-              exit 1
-            fi
-            
-            # 为 amd64 架构创建标签
-            docker tag $AMD64_ID $tag-amd64
-            
-            # 为 arm64 架构创建标签
-            docker tag $ARM64_ID $tag-arm64
-            
-            # 先推送各个架构的镜像
-            echo "Pushing amd64 image for tag: $tag"
-            docker push $tag-amd64
-            
-            echo "Pushing arm64 image for tag: $tag"
-            docker push $tag-arm64
+            echo "Pushing arm64 image with temporary tag: $TEMP_ARM64_TAG"
+            docker push $TEMP_ARM64_TAG
             
             # 创建多架构 manifest
             echo "Creating multi-arch manifest for tag: $tag"
-            docker manifest create $tag $tag-amd64 $tag-arm64
+            docker manifest create $tag $TEMP_AMD64_TAG $TEMP_ARM64_TAG
             
             # 推送到 Docker Hub
             echo "Pushing multi-arch manifest for tag: $tag"
             docker manifest push $tag
             
-            # 清理本地标签
-            docker rmi $tag-amd64 $tag-arm64
+            # 清理本地临时标签
+            docker rmi $TEMP_AMD64_TAG $TEMP_ARM64_TAG
+            
+            echo "Successfully created multi-arch manifest: $tag"
+            echo "Note: Temporary images ($TEMP_AMD64_TAG, $TEMP_ARM64_TAG) remain in Docker Hub"
+            echo "You can manually delete them if desired, or they will be cleaned up by Docker Hub's retention policy"
           done
 
       - name: Verify multi-arch manifest
