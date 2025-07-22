@@ -24,7 +24,9 @@ class DataManager:
         self.config = config
         self.geosite_domains: Set[str] = set()
         self.geosite_index: dict = {}  # 简单的内存索引
-        self.data_dir = Path("/app/data")
+        # 使用临时目录，不需要持久化
+        import tempfile
+        self.data_dir = Path(tempfile.gettempdir()) / "rule-bot"
         self.geoip_file = self.data_dir / "geoip" / "geoip.dat"
         self.geosite_file = self.data_dir / "geosite" / "direct-list.txt"
         

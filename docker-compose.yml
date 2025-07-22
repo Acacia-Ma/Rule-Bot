@@ -40,6 +40,4 @@ services:
       # 时区设置 (设置为北京时间)
       - TZ=Asia/Shanghai
       # ========================================
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs 
+ 

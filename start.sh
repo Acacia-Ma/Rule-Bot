@@ -1,10 +1,5 @@
 #!/bin/sh
 
-# Create data directories if they don't exist
-mkdir -p /app/data/geoip
-mkdir -p /app/data/geosite
-mkdir -p /app/logs
-
 # Start the application
 cd /app
 python -m src.main 

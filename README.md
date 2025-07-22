@@ -240,12 +240,7 @@ docker-compose logs -f rule-bot
 docker pull aethersailor/rule-bot:latest
 ```
 
-#### 2. 创建数据目录
-```bash
-mkdir -p ./rule-bot-data ./rule-bot-logs
-```
-
-#### 3. 运行容器
+#### 2. 运行容器
 
 **必需参数版本（最小配置）：**
 ```bash
@@ -256,8 +251,6 @@ docker run -d \
   -e GITHUB_TOKEN="你的 GitHub Token" \
   -e GITHUB_REPO="your_username/your_repository_name" \
   -e DIRECT_RULE_FILE="your_direct_rule_file_path" \
-  -v $(pwd)/rule-bot-data:/app/data \
-  -v $(pwd)/rule-bot-logs:/app/logs \
   aethersailor/rule-bot:latest
 ```
 
@@ -278,9 +271,6 @@ docker run -d \
   -e REQUIRED_GROUP_ID="your_group_id_here" \
   -e REQUIRED_GROUP_NAME="Your Group Name" \
   -e REQUIRED_GROUP_LINK="https://t.me/your_group_link" \
-  # 数据卷挂载
-  -v $(pwd)/rule-bot-data:/app/data \
-  -v $(pwd)/rule-bot-logs:/app/logs \
   aethersailor/rule-bot:latest
 ```
 
