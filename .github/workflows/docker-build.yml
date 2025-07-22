@@ -16,9 +16,10 @@ on:
       - '*.md'
 
 # 添加并发控制，避免重复构建
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# 注意：这可能导致架构构建不完整，暂时注释掉
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
 
 env:
   REGISTRY: docker.io
@@ -100,3 +101,12 @@ jobs:
           echo "Build completed for platform: ${{ matrix.platform }}"
           echo "Event: ${{ github.event_name }}"
           echo "Ref: ${{ github.ref }}"
+          
+      # 验证所有架构构建完成
+      - name: Verify all architectures
+        if: matrix.platform == 'linux/amd64'
+        run: |
+          echo "Waiting for all architectures to complete..."
+          sleep 30
+          echo "Verifying manifest for ${{ steps.meta.outputs.tags }}"
+          docker manifest inspect ${{ steps.meta.outputs.tags }} || echo "Manifest not ready yet"

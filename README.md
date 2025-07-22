@@ -75,7 +75,7 @@ EOF
 
 3. **启动服务**
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 4. **开始使用**
