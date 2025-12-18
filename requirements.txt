@@ -9,4 +9,4 @@ schedule==1.2.2
 pyinstaller==6.17.0
 psutil==5.9.6
 geoip2==5.2.0
-maxminddb==2.5.2
+maxminddb==3.0.0
