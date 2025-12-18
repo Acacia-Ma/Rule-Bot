@@ -126,6 +126,78 @@ class DNSService:
             logger.error(f"NS记录查询失败: {e}")
             return []
     
+    async def _query_ns_system_dns(self, domain: str) -> List[str]:
+        """使用系统DNS查询NS记录作为备用方案"""
+        try:
+            import dns.resolver
+            import dns.rdatatype
+            
+            # 创建解析器
+            resolver = dns.resolver.Resolver()
+            resolver.timeout = 10
+            resolver.lifetime = 10
+            
+            # 查询NS记录
+            answers = resolver.resolve(domain, dns.rdatatype.NS)
+            ns_servers = [str(rdata).rstrip('.') for rdata in answers]
+            
+            logger.debug(f"系统DNS查询 {domain} NS记录成功，获得 {len(ns_servers)} 个NS服务器")
+            return ns_servers
+            
+        except ImportError:
+            logger.warning("dnspython库未安装，无法使用系统DNS备用查询")
+            return []
+        except Exception as e:
+            logger.warning(f"系统DNS查询NS记录失败: {e}")
+            return []
+    
+    def _build_dns_query(self, domain: str, use_edns_china: bool = True, record_type: int = 1) -> bytes:
+        """构建DNS查询数据包"""
+        try:
+            # DNS头部 (12字节)
+            transaction_id = 0x1234
+            flags = 0x0100  # 标准查询
+            questions = 1
+            answer_rrs = 0
+            authority_rrs = 0
+            additional_rrs = 1 if use_edns_china else 0
+            
+            header = struct.pack('!HHHHHH', 
+                               transaction_id, flags, questions, 
+                               answer_rrs, authority_rrs, additional_rrs)
+            
+            # 构建查询部分
+            query = b''
+            for label in domain.split('.'):
+                query += struct.pack('!B', len(label)) + label.encode('ascii')
+            query += b'\x00'  # 结束标志
+            
+            query += struct.pack('!HH', record_type, 1)  # Type A/NS, Class IN
+            
+            # 如果使用EDNS，添加OPT记录以模拟中国境内查询
+            edns = b''
+            if use_edns_china:
+                # OPT记录格式
+                edns += b'\x00'  # Name (root)
+                edns += struct.pack('!H', 41)  # Type OPT
+                edns += struct.pack('!H', 4096)  # UDP payload size
+                edns += struct.pack('!H', 0)  # Extended RCODE and flags
+                edns += struct.pack('!H', 8)  # RDLEN (8 bytes for ECS)
+                
+                # ECS (EDNS Client Subnet) 选项
+                edns += struct.pack('!H', 8)  # Option code (ECS)
+                edns += struct.pack('!H', 4)  # Option length
+                edns += struct.pack('!H', 1)  # Family (IPv4)
+                edns += struct.pack('!BB', 24, 0)  # Source netmask, Scope netmask
+                # 使用中国的IP段 (例如: 219.0.0.0/24)
+                edns += struct.pack('!BBB', 219, 0, 0)
+            
+            return header + query + edns
+            
+        except Exception as e:
+            logger.error(f"构建DNS查询包失败: {e}")
+            return b''
+    
     async def _perform_doh_query(self, server_name: str, server_url: str, query_data: bytes, parser_func) -> List[str]:
         """执行DoH查询通用方法"""
         max_retries = 2

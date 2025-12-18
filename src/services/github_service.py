@@ -3,6 +3,7 @@ GitHub服务模块
 用于操作GitHub上的规则文件
 """
 
+import asyncio
 import base64
 from datetime import datetime
 from typing import Optional, List, Dict, Any
