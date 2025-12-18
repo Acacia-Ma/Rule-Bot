@@ -57,6 +57,7 @@ class RuleBot:
             async def run_bot():
                 try:
                     async with self.app:
+                        await self.handler_manager.start()  # 显式启动服务（如DNS Session）
                         await self.app.start()
                         await self.app.updater.start_polling(
                             allowed_updates=Update.ALL_TYPES,

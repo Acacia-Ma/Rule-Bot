@@ -39,6 +39,11 @@ class HandlerManager:
         self.group_service = None
         if application:
             self.group_service = GroupService(config, application.bot)
+
+    async def start(self):
+        """启动服务"""
+        if self.dns_service:
+            await self.dns_service.start()
         
         # 用户状态管理
         self.user_states: Dict[int, Dict[str, Any]] = {}
