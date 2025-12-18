@@ -33,8 +33,8 @@ class Config:
         self.REQUIRED_GROUP_LINK = os.getenv("REQUIRED_GROUP_LINK", "")
         
         # 数据源URL
-        # 使用 Loyalsoldier GeoIP 数据库（针对中国 IP 优化，通过 jsdelivr CDN）
-        self.GEOIP_URL = "https://cdn.jsdelivr.net/gh/Loyalsoldier/geoip@release/Country-without-asn.mmdb"
+        # 使用 Loyalsoldier GeoIP 数据库（针对中国 IP 优化）
+        self.GEOIP_URL = "https://raw.githubusercontent.com/Loyalsoldier/geoip/release/Country-without-asn.mmdb"
         self.GEOSITE_URL = "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/refs/heads/release/direct-list.txt"
         
         # DoH服务器配置
