@@ -4,6 +4,13 @@ FROM python:3.11-slim AS builder
 # 设置工作目录
 WORKDIR /app
 
+# 安装基础编译工具 (为了支持 psutil 等可能没有 wheel 的包)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # 复制依赖文件
 COPY requirements.txt .
 
