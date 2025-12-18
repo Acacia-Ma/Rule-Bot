@@ -3,11 +3,17 @@ GeoIP服务模块
 用于查询IP地址的地理位置
 """
 
-import struct
 import socket
 from pathlib import Path
 from typing import Optional, Dict, Any
 from loguru import logger
+
+try:
+    import geoip2.database
+    GEOIP2_AVAILABLE = True
+except ImportError:
+    GEOIP2_AVAILABLE = False
+    logger.warning("geoip2 库未安装，GeoIP 功能将受限")
 
 
 class GeoIPService:
@@ -15,93 +21,76 @@ class GeoIPService:
     
     def __init__(self, geoip_file_path: str):
         self.geoip_file = Path(geoip_file_path)
-        self.data = None
+        self.reader = None
         self._load_data()
     
     def _load_data(self):
         """加载GeoIP数据"""
         try:
+            if not GEOIP2_AVAILABLE:
+                logger.warning("geoip2 库未安装，将使用简化的 IP 范围检查")
+                return
+                
             if not self.geoip_file.exists():
-                logger.warning(f"GeoIP文件不存在: {self.geoip_file}")
+                logger.warning(f"GeoIP 数据库文件不存在: {self.geoip_file}")
+                logger.info("提示：请从 https://dev.maxmind.com/geoip/geolite2-free-geolocation-data 下载 GeoLite2-Country.mmdb")
                 return
             
-            # 这里简化处理，实际应该解析geoip.dat格式
-            # 由于geoip.dat是二进制格式，这里使用一个简化版本
-            logger.info("GeoIP数据加载完成")
-            self.data = True  # 标记数据已加载
+            # 打开 MaxMind DB
+            self.reader = geoip2.database.Reader(str(self.geoip_file))
+            logger.info(f"GeoIP 数据库加载成功: {self.geoip_file}")
             
         except Exception as e:
-            logger.error(f"加载GeoIP数据失败: {e}")
+            logger.error(f"加载 GeoIP 数据失败: {e}")
     
     def get_country_code(self, ip: str) -> Optional[str]:
         """获取IP的国家代码"""
         try:
-            if not self.data:
-                return None
-            
             # 验证IP格式
             socket.inet_aton(ip)
             
-            # 这里应该实际查询geoip.dat文件
-            # 由于格式复杂，这里使用简化的逻辑
-            # 实际实现需要解析MaxMind DB格式
+            # 如果有真实的 GeoIP2 数据库
+            if self.reader:
+                try:
+                    response = self.reader.country(ip)
+                    return response.country.iso_code
+                except geoip2.errors.AddressNotFoundError:
+                    logger.debug(f"IP {ip} 未在 GeoIP 数据库中找到")
+                    return None
+                except Exception as e:
+                    logger.warning(f"GeoIP 查询失败: {e}")
+                    return None
             
-            # 中国大陆IP段的简单检查（仅示例）
-            ip_parts = list(map(int, ip.split('.')))
-            first_octet = ip_parts[0]
-            
-            # 一些已知的中国IP段（非完整列表）
-            china_ranges = [
-                (1, 2),      # 1.0.0.0-2.255.255.255
-                (14, 14),    # 14.0.0.0-14.255.255.255
-                (27, 27),    # 27.0.0.0-27.255.255.255
-                (36, 36),    # 36.0.0.0-36.255.255.255
-                (39, 39),    # 39.0.0.0-39.255.255.255
-                (42, 42),    # 42.0.0.0-42.255.255.255
-                (49, 49),    # 49.0.0.0-49.255.255.255
-                (58, 63),    # 58.0.0.0-63.255.255.255
-                (101, 101),  # 101.0.0.0-101.255.255.255
-                (103, 103),  # 103.0.0.0-103.255.255.255
-                (106, 106),  # 106.0.0.0-106.255.255.255
-                (110, 111),  # 110.0.0.0-111.255.255.255
-                (112, 112),  # 112.0.0.0-112.255.255.255
-                (113, 115),  # 113.0.0.0-115.255.255.255
-                (116, 118),  # 116.0.0.0-118.255.255.255
-                (119, 125),  # 119.0.0.0-125.255.255.255
-                (130, 130),  # 130.0.0.0-130.255.255.255
-                (131, 131),  # 131.0.0.0-131.255.255.255
-                (133, 134),  # 133.0.0.0-134.255.255.255
-                (137, 139),  # 137.0.0.0-139.255.255.255
-                (140, 140),  # 140.0.0.0-140.255.255.255
-                (144, 144),  # 144.0.0.0-144.255.255.255
-                (150, 150),  # 150.0.0.0-150.255.255.255
-                (153, 153),  # 153.0.0.0-153.255.255.255
-                (157, 157),  # 157.0.0.0-157.255.255.255
-                (159, 159),  # 159.0.0.0-159.255.255.255
-                (161, 161),  # 161.0.0.0-161.255.255.255
-                (163, 163),  # 163.0.0.0-163.255.255.255
-                (166, 166),  # 166.0.0.0-166.255.255.255
-                (167, 167),  # 167.0.0.0-167.255.255.255
-                (168, 168),  # 168.0.0.0-168.255.255.255
-                (169, 169),  # 169.0.0.0-169.255.255.255
-                (171, 171),  # 171.0.0.0-171.255.255.255
-                (175, 175),  # 175.0.0.0-175.255.255.255
-                (180, 180),  # 180.0.0.0-180.255.255.255
-                (182, 183),  # 182.0.0.0-183.255.255.255
-                (202, 203),  # 202.0.0.0-203.255.255.255
-                (210, 211),  # 210.0.0.0-211.255.255.255
-                (218, 223),  # 218.0.0.0-223.255.255.255
-            ]
-            
-            for start, end in china_ranges:
-                if start <= first_octet <= end:
-                    return "CN"
-            
-            # 默认返回其他国家
-            return "US"  # 假设非中国IP
+            # 回退到简化的中国 IP 段检查（仅作为备用）
+            return self._fallback_china_check(ip)
             
         except Exception as e:
             logger.error(f"查询IP地理位置失败: {e}")
+            return None
+    
+    def _fallback_china_check(self, ip: str) -> Optional[str]:
+        """备用方案：简化的中国IP段检查"""
+        try:
+            ip_parts = list(map(int, ip.split('.')))
+            first_octet = ip_parts[0]
+            
+            # 扩展的中国 IP 段列表（第一个八位字节）
+            china_first_octets = [
+                1, 2, 14, 27, 36, 39, 42, 43, 45, 46, 47, 49,
+                58, 59, 60, 61, 101, 103, 106, 110, 111, 112, 113, 114, 115,
+                116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 130, 131,
+                133, 134, 137, 139, 140, 144, 150, 153, 157, 159, 161, 163,
+                166, 167, 168, 169, 171, 175, 180, 182, 183, 202, 203, 210,
+                211, 218, 219, 220, 221, 222, 223
+            ]
+            
+            if first_octet in china_first_octets:
+                return "CN"
+            
+            # 默认返回 None 表示未知
+            return None
+            
+        except Exception:
             return None
     
     def is_china_ip(self, ip: str) -> bool:
@@ -114,6 +103,22 @@ class GeoIPService:
         try:
             country_code = self.get_country_code(ip)
             
+            # 如果使用真实数据库且找到结果
+            if self.reader and country_code:
+                try:
+                    response = self.reader.country(ip)
+                    country_name = response.country.names.get('zh-CN') or response.country.name or "未知"
+                    
+                    return {
+                        "ip": ip,
+                        "country_code": country_code,
+                        "country_name": country_name,
+                        "is_china": country_code == "CN"
+                    }
+                except Exception:
+                    pass
+            
+            # 回退到简单映射
             country_names = {
                 "CN": "中国",
                 "US": "美国",
@@ -122,13 +127,16 @@ class GeoIPService:
                 "SG": "新加坡",
                 "HK": "香港",
                 "TW": "台湾",
+                "GB": "英国",
+                "DE": "德国",
+                "FR": "法国",
             }
             
             return {
                 "ip": ip,
                 "country_code": country_code,
-                "country_name": country_names.get(country_code, "未知"),
-                "is_china": country_code == "CN"
+                "country_name": country_names.get(country_code, "未知" if country_code else "未知"),
+                "is_china": country_code == "CN" if country_code else False
             }
             
         except Exception as e:
@@ -138,4 +146,13 @@ class GeoIPService:
                 "country_code": None,
                 "country_name": "未知",
                 "is_china": False
-            } 
+            }
+    
+    def __del__(self):
+        """关闭数据库连接"""
+        if self.reader:
+            try:
+                self.reader.close()
+            except Exception:
+                pass
+ 
