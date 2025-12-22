@@ -124,8 +124,11 @@ class DomainChecker:
                 for ns, summary in ns_summary.items():
                     china_count = summary["china"]
                     foreign_count = summary["foreign"]
-                    if china_count > 0:
+                    # 优化显示：有中国IP显示完整信息，无海外IP时不显示0
+                    if china_count > 0 and foreign_count > 0:
                         result["details"].append(f"  • {ns}: {china_count} 个中国 IP + {foreign_count} 个海外 IP")
+                    elif china_count > 0:
+                        result["details"].append(f"  • {ns}: {china_count} 个中国 IP")
                     else:
                         result["details"].append(f"  • {ns}: {foreign_count} 个海外 IP")
             else:
@@ -162,9 +165,9 @@ class DomainChecker:
             
             # 根据检查结果生成建议
             if has_china_ip:
-                return f"✅ 推荐添加{domain_type} {target_domain}：域名IP在中国大陆"
+                return f"✅ 建议添加{domain_type} {target_domain}：域名IP在中国大陆"
             elif ns_china:
-                return f"✅ 推荐添加{domain_type} {target_domain}：NS服务器在中国大陆"
+                return f"✅ 建议添加{domain_type} {target_domain}：NS服务器在中国大陆"
             else:
                 return f"❌ 不建议添加{domain_type} {target_domain}：域名IP和NS服务器都不在中国大陆"
                     
