@@ -120,17 +120,17 @@ class DomainChecker:
                 else:
                     result["details"].append(f"NS 服务器: 0/{total_ns_count} 个 IP 在中国大陆")
                 
-                # 添加详细的NS服务器信息（简化显示）
+                # 添加详细的NS服务器信息（handler会统一添加•符号）
                 for ns, summary in ns_summary.items():
                     china_count = summary["china"]
                     foreign_count = summary["foreign"]
                     # 优化显示：有中国IP显示完整信息，无海外IP时不显示0
                     if china_count > 0 and foreign_count > 0:
-                        result["details"].append(f"  • {ns}: {china_count} 个中国 IP + {foreign_count} 个海外 IP")
+                        result["details"].append(f"{ns}: {china_count} 个中国 IP + {foreign_count} 个海外 IP")
                     elif china_count > 0:
-                        result["details"].append(f"  • {ns}: {china_count} 个中国 IP")
+                        result["details"].append(f"{ns}: {china_count} 个中国 IP")
                     else:
-                        result["details"].append(f"  • {ns}: {foreign_count} 个海外 IP")
+                        result["details"].append(f"{ns}: {foreign_count} 个海外 IP")
             else:
                 result["details"].append("无法查询到 NS 记录")
             
