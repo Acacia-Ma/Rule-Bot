@@ -157,24 +157,21 @@ class HandlerManager:
             username = user.first_name or user.username or "用户"
             
             welcome_text = f"""
-👋 欢迎使用 Rule-Bot，{username}！
+👋 你好，{username}！
 
-🤖 我是一个专门管理 Clash 规则的机器人，可以帮助您：
+我是 **Rule-Bot**，可以帮你管理 Clash 直连规则。
 
-📂 *目标仓库：* `{self.config.GITHUB_REPO}`
+📂 **当前管理仓库**
+`{self.config.GITHUB_REPO}`
 
-📋 *主要功能：*
-• 🔍 查询域名规则状态
-• ➕ 添加直连规则
-• ➖ 删除规则（暂不可用）
+✨ **我能做什么**
+• 查询域名是否已在规则中
+• 检查域名 IP 归属地（支持 DNS 解析）
+• 智能判断域名是否适合直连
+• 一键添加域名到规则文件
 
-🎯 *支持的操作：*
-• 检查域名是否已在规则中
-• 检查域名是否在 GEOSITE:CN 中
-• DNS 解析和 IP 归属地检查
-• 自动判断添加建议
-
-请选择您要执行的操作：
+💡 **使用提示**
+直接在聊天框输入域名即可查询，或点击下方按钮操作。
 """
             
             keyboard = [
