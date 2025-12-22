@@ -7,36 +7,34 @@ services:
       # ========== 请在下方填入您的配置 ==========
       # Telegram Bot Token (从 @BotFather 获取)
       - TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-      
+
       # GitHub Personal Access Token (需要 repo 权限)
       - GITHUB_TOKEN=your_github_token_here
-      
+
       # GitHub Repository (格式: 用户名/仓库名)
       - GITHUB_REPO=your_username/your_repository_name
-      
+
       # 直连规则文件路径 (相对于仓库根目录)
       - DIRECT_RULE_FILE=your_direct_rule_file_path
-      
+
       # 代理规则文件路径 (可选，暂不使用)
       # - PROXY_RULE_FILE=your_proxy_rule_file_path
       # ========================================
-      
+
       # ========== 可选配置项 ==========
       # GitHub Commit Email (可选: 自定义Rule-Bot的邮箱地址)
       # 提交者名称固定为 Rule-Bot，邮箱可自定义
-      # - GITHUB_COMMIT_EMAIL=your-custom-email@example.com
-      
+      # 示例：使用你的 Rule-Bot GitHub 账号的 noreply 邮箱
+      - GITHUB_COMMIT_EMAIL=250908365+Rule-Bot@users.noreply.github.com
 
-      
       # 群组验证 (可选: 要求用户加入指定群组才能使用机器人)
       # 留空则关闭此功能
       # - REQUIRED_GROUP_ID=-1002413971610
       # - REQUIRED_GROUP_NAME=Custom_OpenClash_Rules | 交流群
       # - REQUIRED_GROUP_LINK=https://t.me/custom_openclash_rules_group
       # ========================================
-      
+
       # ========== 系统配置 ==========
       # 时区设置 (设置为北京时间)
       - TZ=Asia/Shanghai
       # ========================================
- 
