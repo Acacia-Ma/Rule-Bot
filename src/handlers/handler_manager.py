@@ -159,7 +159,7 @@ class HandlerManager:
             welcome_text = f"""
 👋 你好，{username}！
 
-我是 **Rule-Bot**，可以帮你管理 Clash 直连规则。
+我是 **Rule-Bot**，可以帮你管理 Clash 规则。
 
 📂 **当前管理仓库**
 `{self.config.GITHUB_REPO}`
