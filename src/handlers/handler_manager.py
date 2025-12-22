@@ -596,7 +596,7 @@ class HandlerManager:
                 for match in github_result.get("matches", []):
                     result_text += f"   • 第{match['line']}行: {match['rule']}\n"
             else:
-                result_text += "❌ *GitHub规则状态：* 不存在\n"
+                result_text += "❌ *GitHub 规则状态：* 不存在\n"
             
             # 2. 检查是否在GeoSite中
             in_geosite = await self.data_manager.is_domain_in_geosite(domain)
@@ -612,7 +612,7 @@ class HandlerManager:
             if "error" in check_result:
                 result_text += f"\n❌ *域名检查失败：* {check_result['error']}\n"
             else:
-                result_text += "\n📊 *DNS解析信息：*\n"
+                result_text += "\n📊 *DNS 解析信息：*\n"
                 
                 # 显示IP信息
                 if check_result["domain_ips"]:
@@ -738,7 +738,7 @@ class HandlerManager:
             # 1. 防重复检查
             await processing_msg.edit_text("🔍 正在检查域名是否已存在...")
             
-            # 检查GitHub规则
+            # 检查 GitHub 规则
             github_result = await self.github_service.check_domain_in_rules(domain)
             second_level = extract_second_level_domain(domain)
             
