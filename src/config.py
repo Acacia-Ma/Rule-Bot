@@ -18,7 +18,7 @@ class Config:
         self.GITHUB_REPO = self._get_env_required("GITHUB_REPO")
         # 强制使用Rule-Bot身份，只允许自定义邮箱
         self.GITHUB_COMMIT_NAME = "Rule-Bot"
-        self.GITHUB_COMMIT_EMAIL = os.getenv("GITHUB_COMMIT_EMAIL", "rule-bot@example.com")
+        self.GITHUB_COMMIT_EMAIL = os.getenv("GITHUB_COMMIT_EMAIL", "250908365+Rule-Bot@users.noreply.github.com")
         
         # 规则文件配置
         self.DIRECT_RULE_FILE = self._get_env_required("DIRECT_RULE_FILE")
