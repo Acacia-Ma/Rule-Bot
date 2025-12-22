@@ -165,11 +165,11 @@ class DomainChecker:
             
             # 根据检查结果生成建议
             if has_china_ip:
-                return f"✅ 添加{domain_type} {target_domain}：域名IP在中国大陆"
+                return f"✅ 添加{domain_type} {target_domain}：域名 IP 在中国大陆"
             elif ns_china:
-                return f"✅ 添加{domain_type} {target_domain}：NS服务器在中国大陆"
+                return f"✅ 添加{domain_type} {target_domain}：NS 服务器在中国大陆"
             else:
-                return f"❌ 不建议添加{domain_type} {target_domain}：域名IP和NS服务器都不在中国大陆"
+                return f"❌ 不建议添加{domain_type} {target_domain}：域名 IP 和 NS 服务器都不在中国大陆"
                     
         except Exception as e:
             logger.error(f"生成建议失败: {e}")
