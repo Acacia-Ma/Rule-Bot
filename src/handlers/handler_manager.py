@@ -687,7 +687,7 @@ class HandlerManager:
             # 1. 检查是否在GitHub规则中
             github_result = await self.github_service.check_domain_in_rules(domain)
             if github_result.get("exists"):
-                result_text += "✅ *GitHub规则状态：* 已存在\n"
+                result_text += "✅ *GitHub 规则状态：* 已存在\n"
                 for match in github_result.get("matches", []):
                     result_text += f"   • 第{match['line']}行: {match['rule']}\n"
             else:
@@ -1100,7 +1100,7 @@ class HandlerManager:
             logger.debug(f"最终目标域名: {target_domain}, 用户名: {username}, 描述: {description}")
             
             # 显示添加中消息
-            await query.edit_message_text("⏳ 正在添加域名到GitHub规则...")
+            await query.edit_message_text("⏳ 正在添加域名到 GitHub 规则...")
             
             # 添加到GitHub
             add_result = await self.github_service.add_domain_to_rules(
@@ -1164,7 +1164,7 @@ class HandlerManager:
                 target_domain = domain
             
             # 显示添加中消息
-            processing_msg = await message.reply_text("⏳ 正在添加域名到GitHub规则...")
+            processing_msg = await message.reply_text("⏳ 正在添加域名到 GitHub 规则...")
             
             # 添加到GitHub
             username = message.from_user.first_name or message.from_user.username or str(message.from_user.id)
