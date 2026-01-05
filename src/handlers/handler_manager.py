@@ -701,7 +701,7 @@ class HandlerManager:
                 result_text += "❌ *GEOSITE:CN 状态：* 不存在\n"
             
             # 3. 进行综合域名检查
-            await processing_msg.edit_text("🔍 正在检查域名IP和NS信息...")
+            await processing_msg.edit_text("🔍 正在检查域名 IP 和 NS 信息...")
             check_result = await self.domain_checker.check_domain_comprehensive(domain)
             
             if "error" in check_result:
@@ -728,7 +728,7 @@ class HandlerManager:
                     (check_result.get("domain_china_status") or check_result.get("second_level_china_status") or check_result.get("ns_china_status"))):
                     result_text += f"\n💡 *建议：* {check_result['recommendation']}\n"
                 else:
-                    result_text += f"\n ℹ️ *说明：* 域名IP和NS均不在中国大陆，不建议添加\n"
+                    result_text += f"\n ℹ️ *说明：* 域名 IP 和 NS 均不在中国大陆，不建议添加\n"
             
             # 显示操作按钮
             keyboard = []
@@ -893,7 +893,7 @@ class HandlerManager:
                 return
             
             # 2. 进行域名检查
-            await processing_msg.edit_text("🔍 正在检查域名IP和NS信息...")
+            await processing_msg.edit_text("🔍 正在检查域名 IP 和 NS 信息...")
             check_result = await self.domain_checker.check_domain_comprehensive(domain)
             
             if "error" in check_result:
