@@ -27,11 +27,16 @@ services:
       # 建议使用你的 Rule-Bot GitHub 账号的 noreply 邮箱
       # - GITHUB_COMMIT_EMAIL=your-bot-email@users.noreply.github.com
 
-      # 群组验证 (可选: 要求用户加入指定群组才能使用机器人)
+      # 群组验证 (可选: 要求用户加入指定群组才能私聊使用机器人)
       # 留空则关闭此功能
       # - REQUIRED_GROUP_ID=-1002413971610
       # - REQUIRED_GROUP_NAME=Custom_OpenClash_Rules | 交流群
       # - REQUIRED_GROUP_LINK=https://t.me/custom_openclash_rules_group
+
+      # 群组工作模式 (可选: 允许机器人在指定群组中直接响应 @提及)
+      # 支持逗号分隔多个群组 ID，例如：-1001234567890,-1009876543210
+      # 留空则关闭此功能（仅支持私聊模式）
+      # - ALLOWED_GROUP_IDS=-1001234567890,-1009876543210
       # ========================================
 
       # ========== 系统配置 ==========

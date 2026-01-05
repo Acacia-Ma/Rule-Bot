@@ -14,7 +14,7 @@ from telegram.ext import (
 
 from .config import Config
 from .data_manager import DataManager
-from .handlers import HandlerManager
+from .handlers import HandlerManager, GroupHandler
 
 
 class RuleBot:
@@ -25,6 +25,7 @@ class RuleBot:
         self.data_manager = data_manager
         self.app: Optional[Application] = None
         self.handler_manager = None  # 延迟初始化
+        self.group_handler = None  # 群组处理器
     
     async def stop(self):
         """停止机器人"""
@@ -44,6 +45,9 @@ class RuleBot:
             
             # 初始化处理器管理器（需要app实例）
             self.handler_manager = HandlerManager(self.config, self.data_manager, self.app)
+            
+            # 初始化群组处理器
+            self.group_handler = GroupHandler(self.config, self.data_manager, self.handler_manager)
             
             # 注册处理器
             self._register_handlers()
@@ -87,9 +91,18 @@ class RuleBot:
         # 回调查询处理器
         self.app.add_handler(CallbackQueryHandler(self.handler_manager.handle_callback))
         
-        # 消息处理器（用于处理用户输入）
+        # 群组消息处理器（处理群组中 @机器人 的消息）
+        # 注意：需要在私聊消息处理器之前注册，使用 group 参数设置优先级
+        if self.config.ALLOWED_GROUP_IDS:
+            self.app.add_handler(MessageHandler(
+                filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND,
+                self.group_handler.handle_group_message
+            ), group=0)
+            logger.info(f"群组工作模式已启用，允许的群组: {self.config.ALLOWED_GROUP_IDS}")
+        
+        # 私聊消息处理器（用于处理用户输入）
         self.app.add_handler(MessageHandler(
-            filters.TEXT & ~filters.COMMAND, 
+            filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, 
             self.handler_manager.handle_message
         ))
         

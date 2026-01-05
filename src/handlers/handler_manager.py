@@ -58,6 +58,101 @@ class HandlerManager:
         if self.dns_service:
             await self.dns_service.close()
 
+    async def check_and_add_domain_auto(
+        self, 
+        domain: str, 
+        username: str, 
+        description: str = ""
+    ) -> dict:
+        """自动检查并添加域名（无需用户确认）
+        
+        供群组处理器调用，实现一步完成的域名检查和添加流程
+        
+        Args:
+            domain: 待添加的域名（应为二级域名格式）
+            username: 用户名（用于 commit 记录）
+            description: 域名说明（可选）
+            
+        Returns:
+            {
+                "success": bool,
+                "action": "added" | "exists" | "rejected" | "error",
+                "message": str,
+                "commit_url": str  # 仅添加成功时有值
+            }
+        """
+        try:
+            # 1. 检查是否已存在于 GitHub 规则中
+            github_result = await self.github_service.check_domain_in_rules(domain)
+            if github_result.get("exists"):
+                matches = github_result.get("matches", [])
+                match_info = f"第{matches[0]['line']}行" if matches else ""
+                return {
+                    "success": True,
+                    "action": "exists",
+                    "message": f"域名已存在于 GitHub 规则中（{match_info}）"
+                }
+            
+            # 2. 检查是否在 GeoSite 中
+            in_geosite = await self.data_manager.is_domain_in_geosite(domain)
+            if in_geosite:
+                return {
+                    "success": True,
+                    "action": "exists",
+                    "message": "域名已存在于 GEOSITE:CN 中，无需重复添加"
+                }
+            
+            # 3. 进行域名综合检查
+            check_result = await self.domain_checker.check_domain_comprehensive(domain)
+            
+            if "error" in check_result:
+                return {
+                    "success": False,
+                    "action": "error",
+                    "message": f"域名检查失败：{check_result['error']}"
+                }
+            
+            # 4. 判断是否符合添加条件
+            if self.domain_checker.should_reject(check_result):
+                return {
+                    "success": True,
+                    "action": "rejected",
+                    "message": "域名 IP 和 NS 均不在中国大陆，不符合直连规则添加条件"
+                }
+            
+            # 5. 获取目标域名并添加到 GitHub
+            target_domain = self.domain_checker.get_target_domain_to_add(check_result)
+            if not target_domain:
+                target_domain = domain
+            
+            add_result = await self.github_service.add_domain_to_rules(
+                target_domain, username, description
+            )
+            
+            if add_result.get("success"):
+                return {
+                    "success": True,
+                    "action": "added",
+                    "message": "域名已成功添加到直连规则",
+                    "commit_url": add_result.get("commit_url", ""),
+                    "commit_sha": add_result.get("commit_sha", ""),
+                    "target_domain": target_domain
+                }
+            else:
+                return {
+                    "success": False,
+                    "action": "error",
+                    "message": add_result.get("error", "添加失败，未知错误")
+                }
+                
+        except Exception as e:
+            logger.error(f"自动检查并添加域名失败: {e}")
+            return {
+                "success": False,
+                "action": "error",
+                "message": f"处理异常：{str(e)}"
+            }
+
     
     def get_user_state(self, user_id: int) -> Dict[str, Any]:
         """获取用户状态"""

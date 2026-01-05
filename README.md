@@ -7,6 +7,7 @@
 ### 🚀 最简单的部署方式
 
 1. **创建 docker-compose.yml 文件**
+
 ```bash
 # 创建项目目录
 mkdir rule-bot && cd rule-bot
@@ -36,10 +37,11 @@ services:
 EOF
 ```
 
-2. **配置参数**
+1. **配置参数**
 编辑 `docker-compose.yml`，填入您的配置信息：
 
 **必需参数：**
+
 - `TELEGRAM_BOT_TOKEN`: 从 [@BotFather](https://t.me/BotFather) 获取
   - 示例：`1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`
 - `GITHUB_TOKEN`: 从 [GitHub Settings](https://github.com/settings/tokens) 获取
@@ -71,20 +73,23 @@ EOF
   - 示例：`https://t.me/custom_openclash_rules_group`
   - 默认：不填写（群组验证功能关闭）
 
-3. **启动服务**
+1. **启动服务**
+
 ```bash
 docker compose up -d
 ```
 
-4. **开始使用**
+1. **开始使用**
 在 Telegram 中找到您的机器人，发送 `/start` 开始使用
 
 ### 📋 详细配置说明
+
 请查看下方的 [配置说明](#️-配置说明) 部分获取完整的配置选项。
 
 ## 🚀 功能特性
 
 ### 📋 域名管理
+
 - ✅ 域名查询：检查域名是否已在规则中
 - ✅ 域名添加：支持多种 URL 格式，自动提取二级域名
 - ✅ 智能提取：支持完整 URL、带端口、带路径等格式
@@ -93,6 +98,7 @@ docker compose up -d
 - ❌ **.cn 域名限制**：**.cn 域名默认直连，不可手动添加**
 
 ### 🔍 智能检测
+
 - ✅ GitHub 规则检查：检查域名是否已在直连规则中
 - ✅ GEOSITE:CN 检查：检查域名是否已在中国直连列表中
 - ✅ DNS 解析检查：检查域名 IP 是否在中国大陆
@@ -100,15 +106,25 @@ docker compose up -d
 - ✅ 智能建议：根据检查结果提供添加建议
 
 ### 🛡️ 访问控制
+
 - ✅ **群组验证**：可要求用户加入指定 Telegram 群组才能使用
 - ✅ 可配置启用/禁用群组验证功能
 - ✅ 自动提示用户加入群组
 
+### 💬 群组工作模式
+
+- ✅ **群组内使用**：支持在指定群组中直接 @机器人 添加域名
+- ✅ **自动处理**：自动提取消息中的域名，一步完成查询和添加
+- ✅ **回复消息**：支持回复包含域名的消息并 @机器人 快速添加
+- ✅ **多群组支持**：支持配置多个允许的群组
+
 ### 📊 数据统计
+
 - ✅ 实时统计：显示当前规则数量和 GEOSITE 域名数量
 - ✅ 自动更新：定时更新 GeoIP 和 GEOSITE 数据
 
 ### 🔧 系统特性
+
 - ✅ Docker 部署：完整的 Docker Compose 配置
 - ✅ 环境配置：通过环境变量进行配置
 - ✅ 自动重启：容器异常时自动重启
@@ -118,15 +134,37 @@ docker compose up -d
 ## ⚙️ 配置选项
 
 ### 🔐 群组验证配置
+
 ```yaml
-# 群组验证 (可选: 要求用户加入指定群组才能使用机器人)
+# 群组验证 (可选: 要求用户加入指定群组才能私聊使用机器人)
 # 留空则关闭此功能
 - REQUIRED_GROUP_ID=your_group_id_here
 - REQUIRED_GROUP_NAME=Your Group Name
 - REQUIRED_GROUP_LINK=https://t.me/your_group_link
 ```
 
+### 💬 群组工作模式配置
+
+```yaml
+# 群组工作模式 (可选: 允许机器人在指定群组中直接响应 @提及)
+# 支持逗号分隔多个群组 ID
+- ALLOWED_GROUP_IDS=-1001234567890,-1009876543210
+```
+
+**使用方式：**
+
+1. 将机器人添加到群组
+2. 在群组中发送消息并 @机器人：`@YourBot example.com`
+3. 机器人自动查询域名并尝试添加
+
+**回复消息：**
+回复某条包含域名的消息并 @机器人，可快速添加该域名：
+
+- 原消息：`这个网站 example.com 需要直连`
+- 回复：`@YourBot`（仅 @机器人即可）
+
 ### 📝 域名格式支持
+
 ```
 ✅ 支持的格式：
 • example.com
@@ -169,6 +207,7 @@ docker compose up -d
 ## 🚀 部署方式
 
 ### 环境要求
+
 - Docker 20.10+
 - Docker Compose 2.0+
 - Python 3.11+ (本地开发)
@@ -218,11 +257,13 @@ services:
 ```
 
 #### 2. 启动服务
+
 ```bash
 docker-compose up -d
 ```
 
 #### 3. 查看日志
+
 ```bash
 docker-compose logs -f rule-bot
 ```
@@ -230,6 +271,7 @@ docker-compose logs -f rule-bot
 ### 方式二：Docker Run 部署
 
 #### 1. 拉取镜像
+
 ```bash
 docker pull aethersailor/rule-bot:latest
 ```
@@ -237,6 +279,7 @@ docker pull aethersailor/rule-bot:latest
 #### 2. 运行容器
 
 **必需参数版本（最小配置）：**
+
 ```bash
 docker run -d \
   --name rule-bot \
@@ -249,6 +292,7 @@ docker run -d \
 ```
 
 **完整参数版本（包含所有可选配置）：**
+
 ```bash
 docker run -d \
   --name rule-bot \
@@ -269,6 +313,7 @@ docker run -d \
 ```
 
 #### 4. 查看日志
+
 ```bash
 docker logs -f rule-bot
 ```
@@ -278,15 +323,17 @@ docker logs -f rule-bot
 如果您需要自定义构建或修改代码：
 
 1. **克隆项目**
+
 ```bash
 git clone https://github.com/Aethersailor/Rule-Bot.git
 cd Rule-Bot
 ```
 
-2. **配置参数**
+1. **配置参数**
 编辑 `docker-compose.yml` 文件，在 environment 部分填入您的配置
 
-3. **构建并启动**
+2. **构建并启动**
+
 ```bash
 docker-compose up -d --build
 ```
@@ -300,6 +347,7 @@ docker-compose up -d --build
 | `v1.0.0` | 特定版本 | 版本锁定 |
 
 #### 拉取特定版本
+
 ```bash
 # 拉取最新版本
 docker pull aethersailor/rule-bot:latest
@@ -312,20 +360,22 @@ docker pull aethersailor/rule-bot:v1.0.0
 ```
 
 #### 支持的架构
+
 - ✅ `linux/amd64` (x86_64)
 - ✅ `linux/arm64` (ARM64)
-
 
 ### ⚙️ 配置说明
 
 #### 🔐 必需配置
 
 ##### Telegram Bot Token
+
 1. 向 [@BotFather](https://t.me/BotFather) 发送 `/newbot`
 2. 按照提示创建机器人
 3. 复制获得的 token
 
 ##### GitHub Token
+
 1. 访问 [GitHub Settings > Personal access tokens](https://github.com/settings/tokens)
 2. 点击 "Generate new token (classic)"
 3. 选择 `repo` 权限
@@ -348,15 +398,16 @@ docker pull aethersailor/rule-bot:v1.0.0
 | `REQUIRED_GROUP_NAME` | 可选 | 群组名称 | `Custom_OpenClash_Rules | 交流群` | 不填写 |
 | `REQUIRED_GROUP_LINK` | 可选 | 群组链接 | `https://t.me/custom_openclash_rules_group` | 不填写 |
 
-
 #### 🔑 权限要求
 
 ##### GitHub Token 权限
+
 - **必需权限**: `repo` (完整的仓库访问权限)
 - **可选权限**: `public_repo` (仅公开仓库)
 - **说明**: 机器人会自动创建 commit 来添加规则
 
 ##### 仓库权限
+
 - 需要对目标仓库的 **write** 权限
 - 如果要修改其他人的仓库，需要先 Fork 到自己账号下
 - 建议使用自己的仓库进行测试
@@ -380,6 +431,7 @@ docker pull aethersailor/rule-bot:v1.0.0
 ```
 
 ##### 获取群组 ID
+
 1. 将机器人添加到目标群组
 2. 在群组中发送 `/start`
 3. 查看机器人日志获取群组 ID
@@ -388,6 +440,7 @@ docker pull aethersailor/rule-bot:v1.0.0
 #### 📝 配置示例
 
 **最小配置示例（仅必需参数）：**
+
 ```yaml
 environment:
   # 必需参数（必须填写）
@@ -405,6 +458,7 @@ environment:
 ```
 
 **完整配置示例（包含所有可选参数）：**
+
 ```yaml
 environment:
   # 必需参数（必须填写）
@@ -426,6 +480,7 @@ environment:
 ## 使用方法
 
 ### 基本命令
+
 - `/start` - 开始使用机器人
 - `/help` - 查看帮助信息
 - `/query` - 快速查询域名
@@ -434,11 +489,13 @@ environment:
 ### 操作流程
 
 #### 查询域名
+
 1. 点击 "🔍 查询域名" 或发送 `/query`
 2. 输入要查询的域名
 3. 查看详细的查询结果
 
 #### 添加直连规则
+
 1. 点击 "➕ 添加直连规则"
 2. 输入要添加的域名
 3. 系统自动检查域名状态
@@ -447,6 +504,7 @@ environment:
 6. 自动提交到 GitHub
 
 ### 支持的域名格式
+
 - `example.com`
 - `www.example.com`
 - `https://example.com`
@@ -455,6 +513,7 @@ environment:
 ## 工作原理
 
 ### 域名检查流程
+
 1. **防重复检查**
    - 检查域名是否已在 GitHub 规则中
    - 检查二级域名是否已存在
@@ -476,6 +535,7 @@ environment:
    - 域名 IP 不在中国 + NS 不在中国：拒绝添加
 
 ### 数据更新
+
 - GeoIP 数据：每 6 小时自动更新
 - GeoSite 数据：每 6 小时自动更新
 - 内存索引：数据更新后自动重建
@@ -536,6 +596,7 @@ Rule-Bot/
    - 检查群组链接是否有效
 
 ### 日志查看
+
 ```bash
 # 查看实时日志
 docker-compose logs -f rule-bot
@@ -545,6 +606,7 @@ docker-compose logs --tail=100 rule-bot
 ```
 
 ### 重启服务
+
 ```bash
 # 重启所有服务
 docker-compose restart
@@ -559,12 +621,14 @@ docker-compose up -d --build
 ## 💻 开发说明
 
 ### 本地开发
+
 1. 安装 Python 3.11+
 2. 安装依赖：`pip install -r requirements.txt`
 3. 配置环境变量（参考 docker-compose.yml）
 4. 运行：`python -m src.main`
 
 ### 技术栈
+
 - **Python 3.11+**: 主要开发语言
 - **python-telegram-bot**: Telegram Bot API 客户端
 - **PyGithub**: GitHub API 客户端
@@ -574,6 +638,7 @@ docker-compose up -d --build
 - **Docker**: 容器化部署
 
 ### 代码特点
+
 - **模块化设计**: 各功能独立，易于维护
 - **异步编程**: 使用 asyncio 提高性能
 - **完善的错误处理**: 详细的异常捕获和日志记录
@@ -591,6 +656,7 @@ Copyright (c) 2024 AetherSailor
 欢迎提交 Issue 和 Pull Request！
 
 ### 贡献指南
+
 1. Fork 本项目
 2. 创建特性分支：`git checkout -b feature/your-feature`
 3. 提交更改：`git commit -m 'Add some feature'`
@@ -603,6 +669,7 @@ Copyright (c) 2024 AetherSailor
 <summary>点击展开查看更新日志</summary>
 
 ### v0.1.1 (当前版本)
+
 - 🚀 提升用户体验：将用户添加域名限制从每小时 5 个提升到 50 个
 - 🔧 优化 Docker 构建配置，提升构建性能
 - 📝 更新 README 文档，移除无用的 volumes 配置
@@ -610,6 +677,7 @@ Copyright (c) 2024 AetherSailor
 - 🔄 优化数据管理模块，使用临时目录存储
 
 ### v0.1.0
+
 - 🎉 初始版本发布
 - ✅ 支持域名查询和添加直连规则
 - ✅ 自动 GeoIP/GeoSite 数据更新
@@ -621,6 +689,7 @@ Copyright (c) 2024 AetherSailor
 - ✅ 优化的 Docker 镜像标签策略
 
 ### 技术特性
+
 - 多阶段 Docker 构建优化
 - 支持 linux/amd64, linux/arm64 架构
 - 智能缓存策略和构建性能优化
@@ -628,4 +697,4 @@ Copyright (c) 2024 AetherSailor
 - 模块化代码设计
 - 无状态容器设计，无需持久化存储
 
-</details> 
+</details>

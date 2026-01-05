@@ -27,10 +27,14 @@ class Config:
         # 日志配置
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "WARNING")
         
-        # 群组验证配置
+        # 群组验证配置（用于私聊模式下验证用户是否在群组中）
         self.REQUIRED_GROUP_ID = os.getenv("REQUIRED_GROUP_ID", "")
         self.REQUIRED_GROUP_NAME = os.getenv("REQUIRED_GROUP_NAME", "")
         self.REQUIRED_GROUP_LINK = os.getenv("REQUIRED_GROUP_LINK", "")
+        
+        # 群组工作模式配置（允许机器人在这些群组中直接响应 @提及）
+        # 支持逗号分隔的多个群组 ID，例如：-1001234567890,-1009876543210
+        self.ALLOWED_GROUP_IDS = self._parse_group_ids(os.getenv("ALLOWED_GROUP_IDS", ""))
         
         # 数据源URL
         # 使用 Loyalsoldier GeoIP 数据库（针对中国 IP 优化）
@@ -60,4 +64,20 @@ class Config:
         value = os.getenv(key)
         if not value:
             raise ValueError(f"Required environment variable {key} is not set")
-        return value 
+        return value
+    
+    def _parse_group_ids(self, ids_str: str) -> list:
+        """解析群组 ID 列表
+        
+        Args:
+            ids_str: 逗号分隔的群组 ID 字符串
+            
+        Returns:
+            群组 ID 整数列表
+        """
+        if not ids_str.strip():
+            return []
+        try:
+            return [int(gid.strip()) for gid in ids_str.split(",") if gid.strip()]
+        except ValueError:
+            return [] 
