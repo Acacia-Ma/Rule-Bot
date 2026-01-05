@@ -229,6 +229,7 @@ class GroupHandler:
                 
                 result_text = f"✅ **域名添加成功！**\n\n"
                 result_text += f"📍 **域名：** `{domain}`\n"
+                result_text += f"👤 **提交者：** @{username}\n"
                 if result.get("commit_url"):
                     result_text += f"🔗 **查看提交：** [点击查看]({result['commit_url']})\n"
                 result_text += f"\n💡 本小时内还可添加 {remaining} 个域名"
