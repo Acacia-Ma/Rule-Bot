@@ -151,9 +151,22 @@ docker compose up -d
 - ALLOWED_GROUP_IDS=-1001234567890,-1009876543210
 ```
 
+> ⚠️ **重要：必须关闭机器人的 Privacy Mode**
+>
+> Telegram 机器人默认开启 Privacy Mode，只能接收群组中的命令消息，无法接收普通消息。
+>
+> **关闭方法：**
+>
+> 1. 打开 [@BotFather](https://t.me/BotFather)
+> 2. 发送 `/mybots` 并选择你的机器人
+> 3. 点击 `Bot Settings` → `Group Privacy`
+> 4. 点击 `Turn off` 关闭隐私模式
+>
+> 关闭后需要将机器人**移除并重新添加**到群组才能生效。
+
 **使用方式：**
 
-1. 将机器人添加到群组
+1. 将机器人添加到群组（确保已关闭 Privacy Mode）
 2. 在群组中发送消息并 @机器人：`@YourBot example.com`
 3. 机器人自动查询域名并尝试添加
 

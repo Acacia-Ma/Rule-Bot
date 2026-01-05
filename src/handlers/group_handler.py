@@ -80,29 +80,44 @@ class GroupHandler:
             chat = update.effective_chat
             user = update.effective_user
             
+            # 添加入口日志，确认消息被接收
+            logger.info(f"[群组处理器] 收到消息 - 群组: {chat.id if chat else 'None'}, "
+                       f"用户: {user.id if user else 'None'}, "
+                       f"消息: {message.text[:50] if message and message.text else 'None'}...")
+            
             # 基本检查
             if not message or not chat or not user:
+                logger.warning("[群组处理器] 消息/群组/用户对象为空")
                 return
             
             # 只处理群组消息
             if chat.type not in ["group", "supergroup"]:
+                logger.debug(f"[群组处理器] 非群组消息，类型: {chat.type}")
                 return
             
             # 检查群组是否在白名单
+            logger.debug(f"[群组处理器] 检查白名单 - 群组ID: {chat.id}, 白名单: {self.config.ALLOWED_GROUP_IDS}")
             if not self.is_group_allowed(chat.id):
-                logger.debug(f"群组 {chat.id} 不在白名单中，忽略消息")
+                logger.debug(f"[群组处理器] 群组 {chat.id} 不在白名单中，忽略消息")
                 return
+            
+            logger.info(f"[群组处理器] 群组 {chat.id} 在白名单中，继续处理")
             
             # 获取机器人用户名（首次获取后缓存）
             if not self._bot_username:
                 bot = await context.bot.get_me()
                 self._bot_username = bot.username
+                logger.info(f"[群组处理器] 获取机器人用户名: @{self._bot_username}")
             
             # 检查是否 @了机器人
-            if not self.is_bot_mentioned(message, self._bot_username):
+            is_mentioned = self.is_bot_mentioned(message, self._bot_username)
+            logger.debug(f"[群组处理器] 是否提及机器人: {is_mentioned}, 消息内容: {message.text}")
+            
+            if not is_mentioned:
+                logger.debug(f"[群组处理器] 消息未提及机器人，忽略")
                 return
             
-            logger.info(f"群组 {chat.id} 用户 {user.id}(@{user.username}) 提及了机器人")
+            logger.info(f"[群组处理器] 群组 {chat.id} 用户 {user.id}(@{user.username}) 提及了机器人")
             
             # 提取域名
             domain = await self._extract_domain_from_message(message)
