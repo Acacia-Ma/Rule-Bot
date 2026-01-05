@@ -450,7 +450,7 @@ class HandlerManager:
         welcome_text = f"""
 👋 欢迎使用 Rule-Bot，{username}！
 
-🤖 我是一个专门管理Clash规则的机器人，可以帮助您：
+🤖 我是一个专门管理 Clash 规则的机器人，可以帮助您：
 
 📂 *目标仓库：* `{self.config.GITHUB_REPO}`
 
@@ -461,7 +461,7 @@ class HandlerManager:
 
 🎯 *支持的操作：*
 • 检查域名是否已在规则中
-• 检查域名是否在GEOSITE:CN中
+• 检查域名是否在 GEOSITE:CN 中
 • DNS 解析和 IP 归属地检查
 • 自动判断添加建议
 
@@ -486,7 +486,7 @@ class HandlerManager:
         welcome_text = f"""
 👋 欢迎使用 Rule-Bot，{username}！
 
-🤖 我是一个专门管理Clash规则的机器人，可以帮助您：
+🤖 我是一个专门管理 Clash 规则的机器人，可以帮助您：
 
 📂 *目标仓库：* `{self.config.GITHUB_REPO}`
 
@@ -497,8 +497,8 @@ class HandlerManager:
 
 🎯 *支持的操作：*
 • 检查域名是否已在规则中
-• 检查域名是否在GEOSITE:CN中
-• DNS解析和IP归属地检查
+• 检查域名是否在 GEOSITE:CN 中
+• DNS 解析和 IP 归属地检查
 • 自动判断添加建议
 
 请选择您要执行的操作：
@@ -528,7 +528,7 @@ class HandlerManager:
             # 获取GeoSite域名数量
             geosite_count = len(self.data_manager.geosite_domains)
             
-            stats_text = f"📊 *当前统计：*\n• 直连规则数量：{direct_rule_count}\n• GEOSITE:CN域名数量：{geosite_count:,}\n\n"
+            stats_text = f"📊 *当前统计：*\n• 直连规则数量：{direct_rule_count}\n• GEOSITE:CN 域名数量：{geosite_count:,}\n\n"
         except Exception as e:
             logger.error(f"获取统计信息失败: {e}")
             stats_text = "📊 *统计信息加载中...*\n\n"
@@ -878,9 +878,9 @@ class HandlerManager:
             # 检查GeoSite
             in_geosite = await self.data_manager.is_domain_in_geosite(domain)
             if in_geosite:
-                result_text = f"❌ **域名已存在于GEOSITE:CN中**\n\n"
+                result_text = f"❌ **域名已存在于 GEOSITE:CN 中**\n\n"
                 result_text += f"📍 **域名：** `{domain}`\n\n"
-                result_text += "该域名已在GEOSITE:CN规则中，不需要重复添加。"
+                result_text += "该域名已在 GEOSITE:CN 规则中，不需要重复添加。"
                 
                 keyboard = [
                     [InlineKeyboardButton("➕ 添加其他域名", callback_data="add_direct_rule")],
@@ -1119,8 +1119,11 @@ class HandlerManager:
                 result_text += f"👤 **提交者：** @{self.escape_markdown(username)}\n"
                 if description:
                     result_text += f"📝 **说明：** {self.escape_markdown(description)}\n"
+                result_text += f"📂 **文件路径：** `{self.escape_markdown(add_result['file_path'])}`\n"
                 if add_result.get('commit_url'):
                     result_text += f"🔗 **查看提交：** [点击查看]({add_result['commit_url']})\n"
+                    result_text += f"📝 **Commit ID：** `{add_result.get('commit_sha', '')[:8]}`\n"
+                result_text += f"💬 **提交信息：** `{self.escape_markdown(add_result['commit_message'])}`\n"
                 result_text += f"\n💡 本小时内还可添加 {remaining} 个域名"
             else:
                 result_text = f"❌ **域名添加失败**\n\n"
@@ -1181,8 +1184,11 @@ class HandlerManager:
                 result_text += f"👤 **提交者：** @{self.escape_markdown(username)}\n"
                 if description:
                     result_text += f"📝 **说明：** {self.escape_markdown(description)}\n"
+                result_text += f"📂 **文件路径：** `{self.escape_markdown(add_result['file_path'])}`\n"
                 if add_result.get('commit_url'):
                     result_text += f"🔗 **查看提交：** [点击查看]({add_result['commit_url']})\n"
+                    result_text += f"📝 **Commit ID：** `{add_result.get('commit_sha', '')[:8]}`\n"
+                result_text += f"💬 **提交信息：** `{self.escape_markdown(add_result['commit_message'])}`\n"
                 result_text += f"\n💡 本小时内还可添加 {remaining} 个域名"
             else:
                 result_text = f"❌ **域名添加失败**\n\n"
