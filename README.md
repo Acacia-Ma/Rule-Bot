@@ -393,10 +393,12 @@ docker pull aethersailor/rule-bot:v1.0.0
 | **可选参数** | | | | |
 | `PROXY_RULE_FILE` | 可选 | 代理规则文件路径（暂不使用） | `rule/Custom_Proxy.list` | 不填写 |
 | `GITHUB_COMMIT_EMAIL` | 可选 | 自定义提交邮箱地址 | `your-email@example.com` | 系统默认 |
-
-| `REQUIRED_GROUP_ID` | 可选 | 群组 ID | `-1002413971610` | 不填写 |
-| `REQUIRED_GROUP_NAME` | 可选 | 群组名称 | `Custom_OpenClash_Rules | 交流群` | 不填写 |
-| `REQUIRED_GROUP_LINK` | 可选 | 群组链接 | `https://t.me/custom_openclash_rules_group` | 不填写 |
+| **群组验证参数** | | | | |
+| `REQUIRED_GROUP_ID` | 可选 | 要求加入的群组 ID（私聊验证） | `-1002413971610` | 不填写 |
+| `REQUIRED_GROUP_NAME` | 可选 | 群组名称（用于提示） | `Custom_OpenClash_Rules 交流群` | 不填写 |
+| `REQUIRED_GROUP_LINK` | 可选 | 群组链接（用于提示） | `https://t.me/custom_openclash_rules_group` | 不填写 |
+| **群组工作模式** | | | | |
+| `ALLOWED_GROUP_IDS` | 可选 | 允许机器人工作的群组 ID（逗号分隔） | `-1001234567890,-1009876543210` | 不填写 |
 
 #### 🔑 权限要求
 
