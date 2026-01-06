@@ -28,7 +28,8 @@ services:
       - DIRECT_RULE_FILE=your_direct_rule_file_path
       # 可选配置参数
       # - PROXY_RULE_FILE=your_proxy_rule_file_path
-      # - GITHUB_COMMIT_EMAIL=your-custom-email@example.com
+      # - GITHUB_COMMIT_EMAIL=your-bot-email@users.noreply.github.com
+      # - DATA_DIR=/app/data
 
       # - REQUIRED_GROUP_ID=your_group_id_here
       # - REQUIRED_GROUP_NAME=Your Group Name
@@ -58,11 +59,26 @@ EOF
   - 示例：`rule/Custom_Proxy.list`
   - 默认：不填写（功能暂未启用）
 - `GITHUB_COMMIT_EMAIL`: 自定义提交邮箱地址
-  - 示例：`your-email@example.com`
-  - 默认：不填写（使用系统默认邮箱）
+  - 示例：`your-bot-email@users.noreply.github.com`
+  - 默认：不填写（使用 `noreply@users.noreply.github.com`）
 - `LOG_LEVEL`: 日志级别
   - 可选值：`DEBUG`、`INFO`、`WARNING`、`ERROR`
   - 默认：`INFO`
+- `LOG_FORMAT`: 日志格式
+  - 可选值：`compact`、`verbose`
+  - 默认：`compact`（更简洁，适合生产日志）
+- `DATA_UPDATE_INTERVAL`: 数据更新间隔（秒）
+  - 示例：`21600`
+  - 默认：`21600`（6 小时）
+- `DATA_DIR`: 数据目录（容器内路径）
+  - 示例：`/app/data`
+  - 默认：`/app/data`（容器内存储，重启会重新下载数据）
+- `DOH_SERVERS`: A 记录 DoH 服务器列表（逗号分隔 `name=url`）
+  - 示例：`alibaba=https://dns.alidns.com/dns-query,tencent=https://doh.pub/dns-query,cloudflare=https://cloudflare-dns.com/dns-query`
+  - 默认：内置国内/国际 DoH 组合
+- `NS_DOH_SERVERS`: NS 记录 DoH 服务器列表（逗号分隔 `name=url`）
+  - 示例：`cloudflare=https://cloudflare-dns.com/dns-query,google=https://dns.google/dns-query,quad9=https://dns.quad9.net/dns-query`
+  - 默认：内置国际 DoH 组合
 - `REQUIRED_GROUP_ID`: 群组验证 ID
   - 示例：`-1002413971610`
   - 默认：不填写（群组验证功能关闭）
@@ -129,7 +145,7 @@ docker compose up -d
 - ✅ 环境配置：通过环境变量进行配置
 - ✅ 自动重启：容器异常时自动重启
 - ✅ 日志记录：详细的操作日志（输出到 stderr）
-- ✅ 无状态设计：使用临时目录，无需持久化存储
+- ✅ 无状态设计：默认容器内 `/app/data`，无需持久化存储
 
 ## ⚙️ 配置选项
 
@@ -235,7 +251,7 @@ docker compose up -d
 
 - Docker 20.10+
 - Docker Compose 2.0+
-- Python 3.11+ (本地开发)
+- Python 3.12+ (本地开发)
 
 ### 方式一：Docker Compose 部署（推荐）
 
@@ -267,9 +283,9 @@ services:
       # 代理规则文件路径 (可选，暂不使用)
       # - PROXY_RULE_FILE=your_proxy_rule_file_path
       
-      # GitHub Commit Email (可选: 自定义Rule-Bot的邮箱地址)
+      # GitHub Commit Email (可选: 自定义 Rule-Bot 的邮箱地址)
       # 提交者名称固定为 Rule-Bot，邮箱可自定义
-      # - GITHUB_COMMIT_EMAIL=your-custom-email@example.com
+      # - GITHUB_COMMIT_EMAIL=your-bot-email@users.noreply.github.com
       
 
       
@@ -329,8 +345,11 @@ docker run -d \
   -e DIRECT_RULE_FILE="your_direct_rule_file_path" \
   # 可选参数
   # -e PROXY_RULE_FILE="your_proxy_rule_file_path" \
-  # -e GITHUB_COMMIT_EMAIL="your-custom-email@example.com" \
+  # -e GITHUB_COMMIT_EMAIL="your-bot-email@users.noreply.github.com" \
   -e LOG_LEVEL="INFO" \
+  # -e DATA_UPDATE_INTERVAL="21600" \
+  # -e DOH_SERVERS="alibaba=https://dns.alidns.com/dns-query,tencent=https://doh.pub/dns-query,cloudflare=https://cloudflare-dns.com/dns-query" \
+  # -e NS_DOH_SERVERS="cloudflare=https://cloudflare-dns.com/dns-query,google=https://dns.google/dns-query,quad9=https://dns.quad9.net/dns-query" \
   #-e REQUIRED_GROUP_ID="your_group_id_here" \
   #-e REQUIRED_GROUP_NAME="Your Group Name" \
   #-e REQUIRED_GROUP_LINK="https://t.me/your_group_link" \
@@ -417,7 +436,11 @@ docker pull aethersailor/rule-bot:v1.0.0
 | `DIRECT_RULE_FILE` | 必需 | 直连规则文件路径 | `rule/Custom_Direct.list` | 无 |
 | **可选参数** | | | | |
 | `PROXY_RULE_FILE` | 可选 | 代理规则文件路径（暂不使用） | `rule/Custom_Proxy.list` | 不填写 |
-| `GITHUB_COMMIT_EMAIL` | 可选 | 自定义提交邮箱地址 | `your-email@example.com` | 系统默认 |
+| `GITHUB_COMMIT_EMAIL` | 可选 | 自定义提交邮箱地址 | `your-bot-email@users.noreply.github.com` | `noreply@users.noreply.github.com` |
+| `LOG_LEVEL` | 可选 | 日志级别 | `INFO` | `INFO` |
+| `DATA_UPDATE_INTERVAL` | 可选 | 数据更新间隔（秒） | `21600` | `21600` |
+| `DOH_SERVERS` | 可选 | A 记录 DoH 服务器列表（逗号分隔 `name=url`） | `alibaba=https://dns.alidns.com/dns-query,tencent=https://doh.pub/dns-query` | 内置默认值 |
+| `NS_DOH_SERVERS` | 可选 | NS 记录 DoH 服务器列表（逗号分隔 `name=url`） | `cloudflare=https://cloudflare-dns.com/dns-query,google=https://dns.google/dns-query` | 内置默认值 |
 | **群组验证参数** | | | | |
 | `REQUIRED_GROUP_ID` | 可选 | 要求加入的群组 ID（私聊验证） | `-1002413971610` | 不填写 |
 | `REQUIRED_GROUP_NAME` | 可选 | 群组名称（用于提示） | `Custom_OpenClash_Rules 交流群` | 不填写 |
@@ -444,6 +467,7 @@ docker pull aethersailor/rule-bot:v1.0.0
 群组验证功能可以让您限制只有特定群组的成员才能使用机器人：
 
 > ⚠️ **注意：群组验证功能默认关闭。只有同时配置了 `REQUIRED_GROUP_ID`、`REQUIRED_GROUP_NAME` 和 `REQUIRED_GROUP_LINK` 三个参数时，群组验证才会生效。**
+> ?? **验证失败将拒绝使用**：如果 Telegram API 查询失败或网络异常，机器人会拒绝请求并提示稍后再试。
 
 ```yaml
 # 启用群组验证（需要同时配置三个参数）
@@ -478,7 +502,11 @@ environment:
   
       # 可选参数（可以不填写，使用默认值）
     # - PROXY_RULE_FILE=rule/Custom_Proxy.list  # 暂不使用
-  # - GITHUB_COMMIT_EMAIL=your-email@example.com  # 使用系统默认
+  # - GITHUB_COMMIT_EMAIL=your-bot-email@users.noreply.github.com  # 使用系统默认
+  # - LOG_LEVEL=INFO
+  # - DATA_UPDATE_INTERVAL=21600
+  # - DOH_SERVERS=alibaba=https://dns.alidns.com/dns-query,tencent=https://doh.pub/dns-query
+  # - NS_DOH_SERVERS=cloudflare=https://cloudflare-dns.com/dns-query,google=https://dns.google/dns-query
   # - REQUIRED_GROUP_ID=-1002413971610  # 群组验证默认关闭
   # - REQUIRED_GROUP_NAME=Custom_OpenClash_Rules | 交流群
   # - REQUIRED_GROUP_LINK=https://t.me/custom_openclash_rules_group
@@ -496,7 +524,11 @@ environment:
   
       # 可选参数（根据需要选择填写）
     # - PROXY_RULE_FILE=rule/Custom_Proxy.list  # 代理规则（暂不使用）
-  # - GITHUB_COMMIT_EMAIL=your-email@example.com  # 自定义邮箱
+  # - GITHUB_COMMIT_EMAIL=your-bot-email@users.noreply.github.com  # 自定义邮箱
+  # - LOG_LEVEL=INFO
+  # - DATA_UPDATE_INTERVAL=21600
+  # - DOH_SERVERS=alibaba=https://dns.alidns.com/dns-query,tencent=https://doh.pub/dns-query
+  # - NS_DOH_SERVERS=cloudflare=https://cloudflare-dns.com/dns-query,google=https://dns.google/dns-query
   
   # 群组验证（需要同时配置三个参数才生效）
   # - REQUIRED_GROUP_ID=-1002413971610
@@ -512,6 +544,7 @@ environment:
 - `/help` - 查看帮助信息
 - `/query` - 快速查询域名
 - `/add` - 快速添加规则
+- `/skip` - 跳过域名说明输入
 
 ### 操作流程
 
@@ -563,9 +596,9 @@ environment:
 
 ### 数据更新
 
-- GeoIP 数据：每 6 小时自动更新
-- GeoSite 数据：每 6 小时自动更新
-- 内存索引：数据更新后自动重建
+- GeoIP 数据：默认每 6 小时自动更新（可通过 `DATA_UPDATE_INTERVAL` 调整）
+- GeoSite 数据：默认每 6 小时自动更新（可通过 `DATA_UPDATE_INTERVAL` 调整）
+- 内存数据：数据更新后自动重建
 
 ## 📁 目录结构
 
@@ -649,18 +682,19 @@ docker-compose up -d --build
 
 ### 本地开发
 
-1. 安装 Python 3.11+
+1. 安装 Python 3.12+
 2. 安装依赖：`pip install -r requirements.txt`
 3. 配置环境变量（参考 docker-compose.yml）
 4. 运行：`python -m src.main`
 
 ### 技术栈
 
-- **Python 3.11+**: 主要开发语言
+- **Python 3.12+**: 主要开发语言
 - **python-telegram-bot**: Telegram Bot API 客户端
 - **PyGithub**: GitHub API 客户端
 - **aiohttp**: 异步 HTTP 客户端
 - **dnspython**: DNS 查询库
+- **publicsuffix2**: 公共后缀解析
 - **loguru**: 日志管理
 - **Docker**: 容器化部署
 
@@ -701,7 +735,7 @@ Copyright (c) 2024 AetherSailor
 - 🔧 优化 Docker 构建配置，提升构建性能
 - 📝 更新 README 文档，移除无用的 volumes 配置
 - 🏗️ 改进代码结构和性能优化
-- 🔄 优化数据管理模块，使用临时目录存储
+- 🔄 优化数据管理模块，默认使用容器内数据目录
 
 ### v0.1.0
 

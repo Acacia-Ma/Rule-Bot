@@ -6,6 +6,12 @@ import re
 from typing import Optional
 from urllib.parse import urlparse
 
+try:
+    from publicsuffix2 import PublicSuffixList
+    _PSL = PublicSuffixList()
+except ImportError:
+    _PSL = None
+
 
 def extract_domain(url_or_domain: str) -> Optional[str]:
     """从URL或域名中提取域名"""
@@ -58,6 +64,12 @@ def extract_second_level_domain(domain: str) -> Optional[str]:
         
         # 清理域名
         domain = domain.strip().lower()
+
+        if not is_valid_domain(domain):
+            return None
+
+        if _PSL:
+            return _PSL.get_sld(domain)
         
         # 分割域名
         parts = domain.split('.')

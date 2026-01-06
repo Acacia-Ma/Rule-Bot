@@ -54,19 +54,18 @@ class GroupHandler:
         Returns:
             是否提及了机器人
         """
-        if not message.text:
+        if not message.text or not message.entities:
             return False
         
         # 检查 entities 中是否有 mention 类型指向机器人
-        if message.entities:
-            for entity in message.entities:
-                if entity.type == "mention":
-                    mention_text = message.text[entity.offset:entity.offset + entity.length]
-                    if mention_text.lower() == f"@{bot_username.lower()}":
-                        return True
+        for entity in message.entities:
+            if entity.type != "mention":
+                continue
+            mention_text = message.text[entity.offset:entity.offset + entity.length]
+            if mention_text.lower() == f"@{bot_username.lower()}":
+                return True
         
-        # 备用检查：直接在文本中查找
-        return f"@{bot_username}".lower() in message.text.lower()
+        return False
     
     async def handle_group_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理群组消息主入口
@@ -80,14 +79,12 @@ class GroupHandler:
             chat = update.effective_chat
             user = update.effective_user
             
-            # 添加入口日志，确认消息被接收
-            logger.info(f"[群组处理器] 收到消息 - 群组: {chat.id if chat else 'None'}, "
-                       f"用户: {user.id if user else 'None'}, "
-                       f"消息: {message.text[:50] if message and message.text else 'None'}...")
-            
             # 基本检查
             if not message or not chat or not user:
                 logger.warning("[群组处理器] 消息/群组/用户对象为空")
+                return
+            
+            if not message.text:
                 return
             
             # 只处理群组消息
@@ -96,12 +93,14 @@ class GroupHandler:
                 return
             
             # 检查群组是否在白名单
-            logger.debug(f"[群组处理器] 检查白名单 - 群组ID: {chat.id}, 白名单: {self.config.ALLOWED_GROUP_IDS}")
+            logger.debug(f"[群组处理器] 检查白名单 - 群组 ID: {chat.id}, 白名单: {self.config.ALLOWED_GROUP_IDS}")
             if not self.is_group_allowed(chat.id):
                 logger.debug(f"[群组处理器] 群组 {chat.id} 不在白名单中，忽略消息")
                 return
             
-            logger.info(f"[群组处理器] 群组 {chat.id} 在白名单中，继续处理")
+            # 仅处理包含 @mention 实体的消息
+            if not message.entities or not any(entity.type == "mention" for entity in message.entities):
+                return
             
             # 获取机器人用户名（首次获取后缓存）
             if not self._bot_username:
@@ -111,13 +110,12 @@ class GroupHandler:
             
             # 检查是否 @了机器人
             is_mentioned = self.is_bot_mentioned(message, self._bot_username)
-            logger.debug(f"[群组处理器] 是否提及机器人: {is_mentioned}, 消息内容: {message.text}")
-            
             if not is_mentioned:
-                logger.debug(f"[群组处理器] 消息未提及机器人，忽略")
                 return
             
-            logger.info(f"[群组处理器] 群组 {chat.id} 用户 {user.id}(@{user.username}) 提及了机器人")
+            logger.info(f"[群组处理器] 收到@消息 - 群组: {chat.id}, "
+                       f"用户: {user.id}(@{user.username}), "
+                       f"消息: {message.text[:50]}...")
             
             # 提取域名
             domain = await self._extract_domain_from_message(message)

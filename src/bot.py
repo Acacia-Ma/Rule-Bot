@@ -1,5 +1,5 @@
 """
-Telegram机器人主控制器
+Telegram 机器人主控制器
 """
 
 import asyncio
@@ -18,7 +18,7 @@ from .handlers import HandlerManager, GroupHandler
 
 
 class RuleBot:
-    """Rule-Bot主控制器"""
+    """Rule-Bot 主控制器"""
     
     def __init__(self, config: Config, data_manager: DataManager):
         self.config = config
@@ -43,7 +43,7 @@ class RuleBot:
             # 创建应用
             self.app = Application.builder().token(self.config.TELEGRAM_BOT_TOKEN).build()
             
-            # 初始化处理器管理器（需要app实例）
+        # 初始化处理器管理器（需要 app 实例）
             self.handler_manager = HandlerManager(self.config, self.data_manager, self.app)
             
             # 初始化群组处理器
@@ -61,7 +61,7 @@ class RuleBot:
             async def run_bot():
                 try:
                     async with self.app:
-                        await self.handler_manager.start()  # 显式启动服务（如DNS Session）
+                        await self.handler_manager.start()  # 显式启动服务（如 DNS Session）
                         await self.app.start()
                         await self.app.updater.start_polling(
                             allowed_updates=Update.ALL_TYPES,
@@ -87,6 +87,7 @@ class RuleBot:
         self.app.add_handler(CommandHandler("query", self.handler_manager.query_command))
         self.app.add_handler(CommandHandler("add", self.handler_manager.add_command))
         self.app.add_handler(CommandHandler("delete", self.handler_manager.delete_command))
+        self.app.add_handler(CommandHandler("skip", self.handler_manager.skip_command))
         
         # 回调查询处理器
         self.app.add_handler(CallbackQueryHandler(self.handler_manager.handle_callback))
@@ -95,7 +96,7 @@ class RuleBot:
         # 注意：需要在私聊消息处理器之前注册，使用 group 参数设置优先级
         if self.config.ALLOWED_GROUP_IDS:
             self.app.add_handler(MessageHandler(
-                filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND,
+                filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND & filters.Entity("mention"),
                 self.group_handler.handle_group_message
             ), group=0)
             logger.info(f"群组工作模式已启用，允许的群组: {self.config.ALLOWED_GROUP_IDS}")

@@ -1,6 +1,6 @@
 """
-DNS服务模块
-使用DoH (DNS over HTTPS) 查询域名解析
+DNS 服务模块
+使用 DoH (DNS over HTTPS) 查询域名解析
 """
 
 import aiohttp
@@ -13,7 +13,7 @@ from loguru import logger
 
 
 class DNSService:
-    """DNS服务"""
+    """DNS 服务"""
     
     def __init__(self, doh_servers: Dict[str, str], ns_doh_servers: Dict[str, str] = None):
         self.doh_servers = doh_servers
@@ -21,35 +21,34 @@ class DNSService:
         self.session: Optional[aiohttp.ClientSession] = None
         
     async def start(self):
-        """启动DNS服务，初始化共享Session"""
+        """启动 DNS 服务，初始化共享 Session"""
         if not self.session or self.session.closed:
             connector = aiohttp.TCPConnector(
                 limit=100,  # 增加连接限制 
                 limit_per_host=10,
                 ttl_dns_cache=300,
-                use_dns_cache=True,
-                ssl=False
+                use_dns_cache=True
             )
             self.session = aiohttp.ClientSession(connector=connector)
-            logger.info("DNS服务已启动，Session已初始化")
+            logger.info("DNS 服务已启动，Session 已初始化")
 
     async def close(self):
-        """关闭DNS服务"""
+        """关闭 DNS 服务"""
         if self.session and not self.session.closed:
             await self.session.close()
-            logger.info("DNS服务已关闭，Session已释放")
+            logger.info("DNS 服务已关闭，Session 已释放")
     
     async def query_a_record(self, domain: str, use_edns_china: bool = True) -> List[str]:
-        """查询A记录，返回IP地址列表（并发查询所有DoH服务器）"""
+        """查询 A 记录，返回 IP 地址列表（并发查询所有 DoH 服务器）"""
         try:
-            # 确保Session已启动
+            # 确保 Session 已启动
             if not self.session or self.session.closed:
                 await self.start()
 
-            # 构建DNS查询数据包
+            # 构建 DNS 查询数据包
             query_data = self._build_dns_query(domain, use_edns_china)
             
-            # 创建所有DoH服务器的查询任务
+            # 创建所有 DoH 服务器的查询任务
             tasks = []
             for server_name, server_url in self.doh_servers.items():
                 task = asyncio.create_task(
@@ -63,7 +62,7 @@ class DNSService:
                 try:
                     ips = await future
                     if ips:
-                        logger.debug(f"DoH查询 {domain} 成功，获得 {len(ips)} 个IP")
+                        logger.debug(f"DoH 查询 {domain} 成功，获得 {len(ips)} 个 IP")
                         # 取消其他未完成的任务
                         for task in tasks:
                             if not task.done():
@@ -73,24 +72,24 @@ class DNSService:
                     # 单个任务失败不影响其他任务
                     continue
             
-            logger.warning(f"所有DoH服务器查询域名 {domain} 都失败")
+            logger.warning(f"所有 DoH 服务器查询域名 {domain} 都失败")
             return []
             
         except Exception as e:
-            logger.error(f"DNS查询失败: {e}")
+            logger.error(f"DNS 查询失败: {e}")
             return []
     
     async def query_ns_records(self, domain: str) -> List[str]:
-        """查询NS记录，返回权威域名服务器列表（并发查询）"""
+        """查询 NS 记录，返回权威域名服务器列表（并发查询）"""
         try:
-            # 确保Session已启动
+            # 确保 Session 已启动
             if not self.session or self.session.closed:
                 await self.start()
 
-            # 构建NS查询数据包（不使用EDNS中国客户端，避免被过滤）
-            query_data = self._build_dns_query(domain, False, record_type=2)  # NS记录类型为2
+            # 构建 NS 查询数据包（不使用 EDNS 中国客户端，避免被过滤）
+            query_data = self._build_dns_query(domain, False, record_type=2)  # NS 记录类型为 2
             
-            # 创建所有NS DoH服务器的查询任务
+            # 创建所有 NS DoH 服务器的查询任务
             tasks = []
             for server_name, server_url in self.ns_doh_servers.items():
                 task = asyncio.create_task(
@@ -103,7 +102,7 @@ class DNSService:
                 try:
                     ns_servers = await future
                     if ns_servers:
-                        logger.debug(f"DoH查询 {domain} NS记录成功")
+                        logger.debug(f"DoH 查询 {domain} NS 记录成功")
                         # 取消其他任务
                         for task in tasks:
                             if not task.done():
@@ -112,22 +111,22 @@ class DNSService:
                 except Exception:
                     continue
             
-            # DoH查询失败时，尝试使用系统DNS作为备用
-            logger.info(f"DoH查询NS记录失败，尝试使用系统DNS查询 {domain}")
+            # DoH 查询失败时，尝试使用系统 DNS 作为备用
+            logger.info(f"DoH 查询 NS 记录失败，尝试使用系统 DNS 查询 {domain}")
             ns_servers = await self._query_ns_system_dns(domain)
             if ns_servers:
-                logger.debug(f"使用系统DNS查询 {domain} NS记录成功")
+                logger.debug(f"使用系统 DNS 查询 {domain} NS 记录成功")
                 return ns_servers
             
-            logger.warning(f"所有NS记录查询方法都失败，域名: {domain}")
+            logger.warning(f"所有 NS 记录查询方法都失败，域名: {domain}")
             return []
             
         except Exception as e:
-            logger.error(f"NS记录查询失败: {e}")
+            logger.error(f"NS 记录查询失败: {e}")
             return []
     
     async def _query_ns_system_dns(self, domain: str) -> List[str]:
-        """使用系统DNS查询NS记录作为备用方案"""
+        """使用系统 DNS 查询 NS 记录作为备用方案"""
         try:
             import dns.resolver
             import dns.rdatatype
@@ -137,24 +136,24 @@ class DNSService:
             resolver.timeout = 10
             resolver.lifetime = 10
             
-            # 查询NS记录
+            # 查询 NS 记录
             answers = resolver.resolve(domain, dns.rdatatype.NS)
             ns_servers = [str(rdata).rstrip('.') for rdata in answers]
             
-            logger.debug(f"系统DNS查询 {domain} NS记录成功，获得 {len(ns_servers)} 个NS服务器")
+            logger.debug(f"系统 DNS 查询 {domain} NS 记录成功，获得 {len(ns_servers)} 个 NS 服务器")
             return ns_servers
             
         except ImportError:
-            logger.warning("dnspython库未安装，无法使用系统DNS备用查询")
+            logger.warning("dnspython 库未安装，无法使用系统 DNS 备用查询")
             return []
         except Exception as e:
-            logger.warning(f"系统DNS查询NS记录失败: {e}")
+            logger.warning(f"系统 DNS 查询 NS 记录失败: {e}")
             return []
     
     def _build_dns_query(self, domain: str, use_edns_china: bool = True, record_type: int = 1) -> bytes:
-        """构建DNS查询数据包"""
+        """构建 DNS 查询数据包"""
         try:
-            # DNS头部 (12字节)
+            # DNS 头部 (12 字节)
             transaction_id = 0x1234
             flags = 0x0100  # 标准查询
             questions = 1
@@ -174,10 +173,10 @@ class DNSService:
             
             query += struct.pack('!HH', record_type, 1)  # Type A/NS, Class IN
             
-            # 如果使用EDNS，添加OPT记录以模拟中国境内查询
+            # 如果使用 EDNS，添加 OPT 记录以模拟中国境内查询
             edns = b''
             if use_edns_china:
-                # OPT记录格式
+                # OPT 记录格式
                 edns += b'\x00'  # Name (root)
                 edns += struct.pack('!H', 41)  # Type OPT
                 edns += struct.pack('!H', 4096)  # UDP payload size
@@ -189,17 +188,17 @@ class DNSService:
                 edns += struct.pack('!H', 4)  # Option length
                 edns += struct.pack('!H', 1)  # Family (IPv4)
                 edns += struct.pack('!BB', 24, 0)  # Source netmask, Scope netmask
-                # 使用中国的IP段 (例如: 219.0.0.0/24)
+                # 使用中国的 IP 段 (例如: 219.0.0.0/24)
                 edns += struct.pack('!BBB', 219, 0, 0)
             
             return header + query + edns
             
         except Exception as e:
-            logger.error(f"构建DNS查询包失败: {e}")
+            logger.error(f"构建 DNS 查询包失败: {e}")
             return b''
     
     async def _perform_doh_query(self, server_name: str, server_url: str, query_data: bytes, parser_func) -> List[str]:
-        """执行DoH查询通用方法"""
+        """执行 DoH 查询通用方法"""
         max_retries = 2
         for attempt in range(max_retries):
             try:
@@ -239,7 +238,7 @@ class DNSService:
         raise Exception(f"{server_name} query failed after retries")
     
     def _parse_dns_response_a(self, response_data: bytes) -> List[str]:
-        """解析DNS响应中的A记录"""
+        """解析 DNS 响应中的 A 记录"""
         try:
             if len(response_data) < 12:
                 return []
@@ -301,11 +300,11 @@ class DNSService:
             return ips
             
         except Exception as e:
-            logger.error(f"解析DNS响应失败: {e}")
+            logger.error(f"解析 DNS 响应失败: {e}")
             return []
     
     def _parse_dns_response_ns(self, response_data: bytes) -> List[str]:
-        """解析DNS响应中的NS记录"""
+        """解析 DNS 响应中的 NS 记录"""
         try:
             if len(response_data) < 12:
                 return []
@@ -357,7 +356,7 @@ class DNSService:
                 rd_length = rr_data[3]
                 offset += 10
                 
-                # 如果是NS记录 (Type 2)
+                # 如果是 NS 记录 (Type 2)
                 if rr_type == 2 and offset + rd_length <= len(response_data):
                     ns_name = self._parse_domain_name(response_data, offset)
                     if ns_name:
@@ -368,11 +367,11 @@ class DNSService:
             return ns_servers
             
         except Exception as e:
-            logger.error(f"解析NS记录失败: {e}")
+            logger.error(f"解析 NS 记录失败: {e}")
             return []
     
     def _parse_domain_name(self, data: bytes, offset: int) -> str:
-        """解析DNS响应中的域名（处理压缩指针）"""
+        """解析 DNS 响应中的域名（处理压缩指针）"""
         try:
             labels = []
             original_offset = offset

@@ -1,6 +1,6 @@
 """
 处理器管理器
-统一管理所有Telegram消息处理逻辑
+统一管理所有 Telegram 消息处理逻辑
 """
 
 import asyncio
@@ -35,7 +35,7 @@ class HandlerManager:
         self.github_service = GitHubService(config)
         self.domain_checker = DomainChecker(self.dns_service, self.geoip_service)
         
-        # 群组服务（需要bot实例）
+        # 群组服务（需要 bot 实例）
         self.group_service = None
         if application:
             self.group_service = GroupService(config, application.bot)
@@ -52,6 +52,8 @@ class HandlerManager:
         self.user_add_history: Dict[int, list] = defaultdict(list)  # 用户添加历史 {user_id: [timestamp1, timestamp2, ...]}
         self.MAX_DESCRIPTION_LENGTH = 20  # 域名说明最大字符数
         self.MAX_ADDS_PER_HOUR = 50  # 每小时最多添加域名数
+        self.MAX_DETAIL_LINES = 6  # 检查详情最大行数
+        self.MAX_DETAIL_LINE_LENGTH = 120  # 单行详情最大长度
 
     async def stop(self):
         """停止服务"""
@@ -212,7 +214,7 @@ class HandlerManager:
         return True, description
     
     def escape_markdown(self, text: str) -> str:
-        """转义Markdown特殊字符"""
+        """转义 Markdown 特殊字符"""
         if not text:
             return text
         
@@ -222,6 +224,158 @@ class HandlerManager:
             text = text.replace(char, f'\\{char}')
         
         return text
+
+    def _build_main_menu_text(self, username: str) -> str:
+        """构建主菜单文案"""
+        return f"""
+👋 欢迎使用 Rule-Bot，{username}！
+
+🤖 我是一个专门管理 Clash 规则的机器人，可以帮助您：
+
+📂 *目标仓库：* `{self.config.GITHUB_REPO}`
+
+✨ *主要功能：*
+• 🔍 查询域名规则状态
+• ➕ 添加直连规则
+• 🗑️ 删除规则（暂不可用）
+
+🧭 *支持的操作：*
+• ✅ 检查域名是否已在规则中
+• 🌐 检查域名是否在 GEOSITE:CN 中
+• 📡 DNS 解析和 IP 归属地检查
+• 🤖 自动判断添加建议
+
+请选择您要执行的操作：
+"""
+
+    def _build_main_menu_keyboard(self) -> InlineKeyboardMarkup:
+        """构建主菜单键盘"""
+        keyboard = [
+            [InlineKeyboardButton("🔍 查询域名", callback_data="query_domain")],
+            [InlineKeyboardButton("➕ 添加直连规则", callback_data="add_direct_rule")],
+            [InlineKeyboardButton("➕ 添加代理规则", callback_data="add_proxy_rule")],
+            [InlineKeyboardButton("➖ 删除规则", callback_data="delete_rule")],
+            [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="help")]
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def _build_help_text(self) -> str:
+        """构建帮助文案"""
+        return f"""
+📖 *Rule-Bot 使用说明*
+
+📂 *目标仓库：* `{self.config.GITHUB_REPO}`
+📄 *直连规则文件：* `{self.config.DIRECT_RULE_FILE}`
+📄 *代理规则文件：* `{self.config.PROXY_RULE_FILE}`
+
+🔍 *查询域名功能：*
+• 检查域名是否在直连规则中
+• 检查域名是否在 GEOSITE:CN 中
+• 显示域名的 IP 归属地信息
+
+➕ *添加直连规则功能：*
+• 自动检查域名 IP 归属地
+• 检查 NS 服务器归属地
+• 根据检查结果自动判断是否适合添加
+• 支持添加说明信息
+
+🧭 *操作流程：*
+1. 选择功能按钮
+2. 输入域名（支持多种格式）
+3. 查看检查结果
+4. 根据提示进行操作
+
+⚠️ *注意事项：*
+• 代理规则添加功能暂不支持
+• 删除规则功能暂不支持
+• 域名检查基于 DoH 和 GeoIP 数据
+
+🛠️ *技术特性：*
+• 使用中国境内 EDNS 查询
+• 支持阿里云和腾讯云 DoH
+• 自动更新 GeoIP 和 GeoSite 数据
+"""
+
+    def _build_help_keyboard(self) -> InlineKeyboardMarkup:
+        """构建帮助键盘"""
+        keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]
+        return InlineKeyboardMarkup(keyboard)
+
+    async def _build_stats_text(self, user_id: Optional[int] = None, include_limit: bool = False) -> str:
+        """构建统计信息文案"""
+        try:
+            github_stats = await self.github_service.get_file_stats()
+            direct_rule_count = github_stats.get("rule_count", 0) if "error" not in github_stats else 0
+            geosite_count = len(self.data_manager.geosite_domains)
+            stats_text = f"📊 *当前统计：*\n• 直连规则数量：{direct_rule_count}\n• GEOSITE:CN 域名数量：{geosite_count:,}\n\n"
+
+            if include_limit and user_id is not None:
+                can_add, remaining = self.check_user_add_limit(user_id)
+                if can_add:
+                    stats_text += f"⏳ *添加限制：* 本小时内还可添加 {remaining} 个域名\n\n"
+                else:
+                    stats_text += f"⛔ *添加限制：* 本小时内已达到添加上限，请稍后再试\n\n"
+
+            return stats_text
+        except Exception as e:
+            logger.error(f"获取统计信息失败: {e}")
+            return "⏳ *统计信息加载中...*\n\n"
+
+    def _format_detail_lines(self, details: list) -> str:
+        """格式化检查详情"""
+        if not details:
+            return ""
+
+        lines = []
+        for detail in details[:self.MAX_DETAIL_LINES]:
+            detail = str(detail)
+            if len(detail) > self.MAX_DETAIL_LINE_LENGTH:
+                detail = detail[:self.MAX_DETAIL_LINE_LENGTH - 3] + "..."
+            lines.append(f"   • {detail}")
+
+        remaining = len(details) - self.MAX_DETAIL_LINES
+        if remaining > 0:
+            lines.append(f"   • 还有 {remaining} 条")
+
+        return "\n".join(lines)
+
+    def _build_query_prompt(self, stats_text: str) -> str:
+        """构建查询提示文案"""
+        return (
+            "🔍 *域名查询*\n\n"
+            f"📂 *目标仓库：* `{self.config.GITHUB_REPO}`\n"
+            f"📄 *规则文件：* `{self.config.DIRECT_RULE_FILE}`\n\n"
+            f"{stats_text}"
+            "请输入要查询的域名：\n\n"
+            "📎 支持格式：\n"
+            "• example.com\n"
+            "• www.example.com\n"
+            "• https://example.com\n"
+            "• https://www.example.com/path\n"
+            "• sub.example.com\n"
+            "• ftp://example.com\n"
+            "• example.com:8080\n\n"
+            "⚠️ *注意：添加规则时统一使用二级域名*"
+        )
+
+    def _build_add_prompt(self, stats_text: str) -> str:
+        """构建添加提示文案"""
+        return (
+            "➕ *添加直连规则*\n\n"
+            f"📂 *目标仓库：* `{self.config.GITHUB_REPO}`\n"
+            f"📄 *规则文件：* `{self.config.DIRECT_RULE_FILE}`\n\n"
+            f"{stats_text}"
+            "请输入要添加的域名：\n\n"
+            "📎 支持格式：\n"
+            "• example.com\n"
+            "• www.example.com\n"
+            "• https://example.com\n"
+            "• https://www.example.com/path\n"
+            "• sub.example.com\n"
+            "• ftp://example.com\n"
+            "• example.com:8080\n\n"
+            "⚠️ *注意：系统将自动提取二级域名进行添加*"
+        )
     
     async def check_group_membership(self, update: Update) -> bool:
         """检查用户群组成员身份"""
@@ -229,17 +383,28 @@ class HandlerManager:
             return True
         
         user_id = update.effective_user.id
-        is_member = await self.group_service.check_user_in_group(user_id)
+        check_result = await self.group_service.check_user_in_group(user_id)
         
-        if not is_member:
+        if check_result is True:
+            return True
+
+        if check_result is False:
             join_message = self.group_service.get_join_group_message()
             if update.callback_query:
                 await update.callback_query.answer()
                 await update.callback_query.edit_message_text(join_message, parse_mode='Markdown')
             else:
                 await update.message.reply_text(join_message, parse_mode='Markdown')
+            return False
+
+        error_message = "⚠️ 群组验证失败，请稍后重试。"
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.edit_message_text(error_message, parse_mode='Markdown')
+        else:
+            await update.message.reply_text(error_message, parse_mode='Markdown')
         
-        return is_member
+        return False
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /start 命令"""
@@ -285,79 +450,32 @@ class HandlerManager:
             self.set_user_state(user.id, "idle")
             
         except Exception as e:
-            logger.error(f"处理start命令失败: {e}")
+            logger.error(f"处理 start 命令失败: {e}")
             await update.message.reply_text("服务暂时不可用，请稍后再试。")
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /help 命令"""
-        help_text = f"""
-📖 *Rule-Bot 使用说明*
+        await update.message.reply_text(
+            self._build_help_text(),
+            reply_markup=self._build_help_keyboard(),
+            parse_mode='Markdown'
+        )
 
-📂 *目标仓库：* `{self.config.GITHUB_REPO}`
-📄 *直连规则文件：* `{self.config.DIRECT_RULE_FILE}`
-📄 *代理规则文件：* `{self.config.PROXY_RULE_FILE}`
-
-🔍 *查询域名功能：*
-• 检查域名是否在直连规则中
-• 检查域名是否在 GEOSITE:CN 中
-• 显示域名的 IP 归属地信息
-
-➕ *添加直连规则功能：*
-• 自动检查域名 IP 归属地
-• 检查 NS 服务器归属地
-• 根据检查结果自动判断是否适合添加
-• 支持添加说明信息
-
-📝 *操作流程：*
-1. 选择功能按钮
-2. 输入域名（支持多种格式）
-3. 查看检查结果
-4. 根据提示进行操作
-
-⚠️ *注意事项：*
-• 代理规则添加功能暂不支持
-• 删除规则功能暂不支持
-• 域名检查基于 DoH 和 GeoIP 数据
-
-🛠 *技术特性：*
-• 使用中国境内 EDNS 查询
-• 支持阿里云和腾讯云 DoH
-• 自动更新 GeoIP 和 GeoSite 数据
-"""
-        
-        keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(help_text, reply_markup=reply_markup, parse_mode='Markdown')
-    
     async def query_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /query 命令"""
         user_id = update.effective_user.id
         self.set_user_state(user_id, "waiting_query_domain")
-        
-        # 获取统计信息
-        try:
-            # 获取GitHub直连规则数量
-            github_stats = await self.github_service.get_file_stats()
-            direct_rule_count = github_stats.get("rule_count", 0) if "error" not in github_stats else 0
-            
-            # 获取GeoSite域名数量
-            geosite_count = len(self.data_manager.geosite_domains)
-            
-            stats_text = f"📊 *当前统计：*\n• 直连规则数量：{direct_rule_count}\n• GEOSITE:CN 域名数量：{geosite_count:,}\n\n"
-        except Exception as e:
-            logger.error(f"获取统计信息失败: {e}")
-            stats_text = "📊 *统计信息加载中...*\n\n"
-        
+
+        stats_text = await self._build_stats_text()
         keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         await update.message.reply_text(
-            f"🔍 *域名查询*\n\n📂 *目标仓库：* `{self.config.GITHUB_REPO}`\n📄 *规则文件：* `{self.config.DIRECT_RULE_FILE}`\n\n{stats_text}请输入要查询的域名：\n\n📝 支持格式：\n• example.com\n• www.example.com\n• https://example.com\n• https://www.example.com/path\n• sub.example.com\n• ftp://example.com\n• example.com:8080\n\n💡 *注意：添加规则时统一使用二级域名*",
+            self._build_query_prompt(stats_text),
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
-    
+
     async def add_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /add 命令"""
         keyboard = [
@@ -378,6 +496,23 @@ class HandlerManager:
             "➖ **删除规则功能暂不可用**\n\n该功能正在开发中，敬请期待。"
         )
     
+    async def skip_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理 /skip 命令"""
+        try:
+            if not await self.check_group_membership(update):
+                return
+
+            user_id = update.effective_user.id
+            user_state = self.get_user_state(user_id)
+            if user_state.get("state") != "waiting_description":
+                await update.message.reply_text("当前没有需要跳过的说明。")
+                return
+
+            await self._add_domain_to_github_message(update.message, user_id, "")
+        except Exception as e:
+            logger.error(f"处理 skip 命令失败: {e}")
+            await update.message.reply_text("处理失败，请重试。")
+
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理回调查询"""
         try:
@@ -446,139 +581,45 @@ class HandlerManager:
     async def _show_main_menu(self, query):
         """显示主菜单"""
         username = query.from_user.first_name or query.from_user.username or "用户"
-        
-        welcome_text = f"""
-👋 欢迎使用 Rule-Bot，{username}！
-
-🤖 我是一个专门管理 Clash 规则的机器人，可以帮助您：
-
-📂 *目标仓库：* `{self.config.GITHUB_REPO}`
-
-📋 *主要功能：*
-• 🔍 查询域名规则状态
-• ➕ 添加直连规则
-• ➖ 删除规则（暂不可用）
-
-🎯 *支持的操作：*
-• 检查域名是否已在规则中
-• 检查域名是否在 GEOSITE:CN 中
-• DNS 解析和 IP 归属地检查
-• 自动判断添加建议
-
-请选择您要执行的操作：
-"""
-        
-        keyboard = [
-            [InlineKeyboardButton("🔍 查询域名", callback_data="query_domain")],
-            [InlineKeyboardButton("➕ 添加直连规则", callback_data="add_direct_rule")],
-            [InlineKeyboardButton("➕ 添加代理规则", callback_data="add_proxy_rule")],
-            [InlineKeyboardButton("➖ 删除规则", callback_data="delete_rule")],
-            [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="help")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
+        welcome_text = self._build_main_menu_text(username)
+        reply_markup = self._build_main_menu_keyboard()
         await query.edit_message_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
-    
+
     async def _show_main_menu_message(self, message):
         """通过消息显示主菜单"""
         username = message.from_user.first_name or message.from_user.username or "用户"
-        
-        welcome_text = f"""
-👋 欢迎使用 Rule-Bot，{username}！
-
-🤖 我是一个专门管理 Clash 规则的机器人，可以帮助您：
-
-📂 *目标仓库：* `{self.config.GITHUB_REPO}`
-
-📋 *主要功能：*
-• 🔍 查询域名规则状态
-• ➕ 添加直连规则
-• ➖ 删除规则（暂不可用）
-
-🎯 *支持的操作：*
-• 检查域名是否已在规则中
-• 检查域名是否在 GEOSITE:CN 中
-• DNS 解析和 IP 归属地检查
-• 自动判断添加建议
-
-请选择您要执行的操作：
-"""
-        
-        keyboard = [
-            [InlineKeyboardButton("🔍 查询域名", callback_data="query_domain")],
-            [InlineKeyboardButton("➕ 添加直连规则", callback_data="add_direct_rule")],
-            [InlineKeyboardButton("➕ 添加代理规则", callback_data="add_proxy_rule")],
-            [InlineKeyboardButton("➖ 删除规则", callback_data="delete_rule")],
-            [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="help")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
+        welcome_text = self._build_main_menu_text(username)
+        reply_markup = self._build_main_menu_keyboard()
         await message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
-    
+
     async def _start_domain_query(self, query, user_id: int):
         """开始域名查询"""
         self.set_user_state(user_id, "waiting_query_domain")
-        
-        # 获取统计信息
-        try:
-            # 获取GitHub直连规则数量
-            github_stats = await self.github_service.get_file_stats()
-            direct_rule_count = github_stats.get("rule_count", 0) if "error" not in github_stats else 0
-            
-            # 获取GeoSite域名数量
-            geosite_count = len(self.data_manager.geosite_domains)
-            
-            stats_text = f"📊 *当前统计：*\n• 直连规则数量：{direct_rule_count}\n• GEOSITE:CN 域名数量：{geosite_count:,}\n\n"
-        except Exception as e:
-            logger.error(f"获取统计信息失败: {e}")
-            stats_text = "📊 *统计信息加载中...*\n\n"
-        
+
+        stats_text = await self._build_stats_text()
         keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         await query.edit_message_text(
-            f"🔍 *域名查询*\n\n📂 *目标仓库：* `{self.config.GITHUB_REPO}`\n📄 *规则文件：* `{self.config.DIRECT_RULE_FILE}`\n\n{stats_text}请输入要查询的域名：\n\n📝 支持格式：\n• example.com\n• www.example.com\n• https://example.com\n• https://www.example.com/path\n• sub.example.com\n• ftp://example.com\n• example.com:8080\n\n💡 *注意：添加规则时统一使用二级域名*",
+            self._build_query_prompt(stats_text),
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
-    
+
     async def _start_add_direct_rule(self, query, user_id: int):
         """开始添加直连规则"""
         self.set_user_state(user_id, "waiting_add_domain")
-        
-        # 检查用户添加限制状态
-        can_add, remaining = self.check_user_add_limit(user_id)
-        
-        # 获取统计信息
-        try:
-            # 获取GitHub直连规则数量
-            github_stats = await self.github_service.get_file_stats()
-            direct_rule_count = github_stats.get("rule_count", 0) if "error" not in github_stats else 0
-            
-            # 获取GeoSite域名数量
-            geosite_count = len(self.data_manager.geosite_domains)
-            
-            stats_text = f"📊 *当前统计：*\n• 直连规则数量：{direct_rule_count}\n• GEOSITE:CN 域名数量：{geosite_count:,}\n\n"
-            
-            # 添加用户限制信息
-            if can_add:
-                stats_text += f"💡 *添加限制：* 本小时内还可添加 {remaining} 个域名\n\n"
-            else:
-                stats_text += f"⚠️ *添加限制：* 本小时内已达到添加上限，请稍后再试\n\n"
-                
-        except Exception as e:
-            logger.error(f"获取统计信息失败: {e}")
-            stats_text = "📊 *统计信息加载中...*\n\n"
-        
+
+        stats_text = await self._build_stats_text(user_id=user_id, include_limit=True)
         keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         await query.edit_message_text(
-            f"➕ *添加直连规则*\n\n📂 *目标仓库：* `{self.config.GITHUB_REPO}`\n📄 *规则文件：* `{self.config.DIRECT_RULE_FILE}`\n\n{stats_text}请输入要添加的域名：\n\n📝 支持格式：\n• example.com\n• www.example.com\n• https://example.com\n• https://www.example.com/path\n• sub.example.com\n• ftp://example.com\n• example.com:8080\n\n💡 *注意：系统将自动提取二级域名进行添加*",
+            self._build_add_prompt(stats_text),
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
-    
+
     async def _show_proxy_rule_not_supported(self, query):
         """显示代理规则不支持"""
         keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]
@@ -603,41 +644,12 @@ class HandlerManager:
     
     async def _show_help(self, query):
         """显示帮助信息"""
-        help_text = f"""
-📖 *Rule-Bot 使用说明*
+        await query.edit_message_text(
+            self._build_help_text(),
+            reply_markup=self._build_help_keyboard(),
+            parse_mode='Markdown'
+        )
 
-📂 *目标仓库：* `{self.config.GITHUB_REPO}`
-📄 *直连规则文件：* `{self.config.DIRECT_RULE_FILE}`
-📄 *代理规则文件：* `{self.config.PROXY_RULE_FILE}`
-
-🔍 *查询域名功能：*
-• 检查域名是否在直连规则中
-• 检查域名是否在 GEOSITE:CN 中
-• 显示域名的 IP 归属地信息
-
-➕ *添加直连规则功能：*
-• 自动检查域名 IP 归属地
-• 检查 NS 服务器归属地
-• 根据检查结果自动判断是否适合添加
-• 支持添加说明信息
-
-📝 *操作流程：*
-1. 选择功能按钮
-2. 输入域名（支持多种格式）
-3. 查看检查结果
-4. 根据提示进行操作
-
-⚠️ *注意事项：*
-• 代理规则添加功能暂不支持
-• 删除规则功能暂不支持
-• 域名检查基于 DoH 和 GeoIP 数据
-"""
-        
-        keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode='Markdown')
-    
     async def _handle_domain_query(self, update: Update, domain_input: str, user_id: int):
         """处理域名查询"""
         try:
@@ -658,13 +670,13 @@ class HandlerManager:
             if is_cn:
                 # .cn域名直接显示提示，不进行任何查询操作
                 result_text = f"🔍 *域名查询结果*\n\n📍 *查询域名：* `{domain}`\n\n"
-                result_text += "📋 *.cn域名说明：* 所有.cn域名默认直连，无需手动添加到规则中\n\n"
-                result_text += "💡 *.cn域名包括：*\n"
+                result_text += "📋 *.cn 域名说明：* 所有 .cn 域名默认直连，无需手动添加到规则中\n\n"
+                result_text += "💡 *.cn 域名包括：*\n"
                 result_text += "   • .cn 顶级域名\n"
                 result_text += "   • .com.cn 二级域名\n"
                 result_text += "   • .net.cn 二级域名\n"
                 result_text += "   • .org.cn 二级域名\n"
-                result_text += "   • 其他所有.cn结尾的域名\n\n"
+                result_text += "   • 其他所有 .cn 结尾的域名\n\n"
                 result_text += "✅ *状态：* 域名已默认直连，无需任何操作"
                 
                 # 显示操作按钮（不包含添加按钮）
@@ -716,10 +728,10 @@ class HandlerManager:
                     result_text += f"   • 二级域名 IP: {', '.join(check_result['second_level_ips'])}\n"
                 
                 # 显示详细信息
-                if check_result["details"]:
+                detail_lines = self._format_detail_lines(check_result.get("details", []))
+                if detail_lines:
                     result_text += "\n🌍 *IP 归属地信息：*\n"
-                    for detail in check_result["details"][:5]:  # 限制显示数量
-                        result_text += f"   • {detail}\n"
+                    result_text += f"{detail_lines}\n"
                 
                 # 根据条件显示建议和状态
                 if github_result.get("exists") or in_geosite:
@@ -792,8 +804,8 @@ class HandlerManager:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await processing_msg.edit_text(
-                    "❌ **.cn域名不可添加**\n\n"
-                    "📋 **.cn域名默认直连**：所有.cn结尾的域名都已默认走直连路线，无需手动添加到规则中。\n\n"
+                    "❌ **.cn 域名不可添加**\n\n"
+                    "📋 **.cn 域名默认直连**：所有 .cn 结尾的域名都已默认走直连路线，无需手动添加到规则中。\n\n"
                     "💡 如需添加其他域名，请选择下方操作：",
                     reply_markup=reply_markup,
                     parse_mode='Markdown'
@@ -814,8 +826,8 @@ class HandlerManager:
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     await processing_msg.edit_text(
-                        "❌ **.cn域名不可添加**\n\n"
-                        "📋 **.cn域名默认直连**：所有.cn结尾的域名都已默认走直连路线，无需手动添加到规则中。",
+                        "❌ **.cn 域名不可添加**\n\n"
+                        "📋 **.cn 域名默认直连**：所有 .cn 结尾的域名都已默认走直连路线，无需手动添加到规则中。",
                         reply_markup=reply_markup,
                         parse_mode='Markdown'
                     )
@@ -911,11 +923,11 @@ class HandlerManager:
             result_text += f"📍 **域名：** `{domain}`\n\n"
             
             # 显示详细信息
-            if check_result["details"]:
-                result_text += "🌍 **检查详情：**\n"
-                for detail in check_result["details"]:
-                    result_text += f"   • {detail}\n"
-            
+            detail_lines = self._format_detail_lines(check_result.get("details", []))
+            if detail_lines:
+                result_text += "📌 **检查详情：**\n"
+                result_text += f"{detail_lines}\n"
+
             result_text += f"\n💡 **建议：** {check_result['recommendation']}\n"
             
             # 根据检查结果决定下一步
@@ -965,11 +977,11 @@ class HandlerManager:
             result_text = f"📊 **域名检查结果**\n\n"
             result_text += f"📍 **域名：** `{domain}`\n\n"
             
-            if check_result["details"]:
-                result_text += "🌍 **检查详情：**\n"
-                for detail in check_result["details"]:
-                    result_text += f"   • {detail}\n"
-            
+            detail_lines = self._format_detail_lines(check_result.get("details", []))
+            if detail_lines:
+                result_text += "📌 **检查详情：**\n"
+                result_text += f"{detail_lines}\n"
+
             result_text += f"\n💡 **建议：** {check_result['recommendation']}\n"
             
             # 根据检查结果决定下一步
@@ -1031,7 +1043,7 @@ class HandlerManager:
             await query.edit_message_text(
                 f"📝 **请输入域名说明**\n\n"
                 f"📍 **域名：** `{domain}`\n\n"
-                f"请输入该域名的用途说明（限制20个汉字以内）：\n\n"
+                f"请输入该域名的用途说明（限制 20 个汉字以内）：\n\n"
                 f"例如：游戏官网、视频网站、新闻门户等",
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
@@ -1075,7 +1087,7 @@ class HandlerManager:
             await update.message.reply_text("处理失败，请重试。")
     
     async def _add_domain_to_github(self, query, user_id: int, description: str):
-        """添加域名到GitHub"""
+        """添加域名到 GitHub"""
         try:
             user_state = self.get_user_state(user_id)
             domain_data = user_state.get("data", {})
@@ -1102,7 +1114,7 @@ class HandlerManager:
             # 显示添加中消息
             await query.edit_message_text("⏳ 正在添加域名到 GitHub 规则...")
             
-            # 添加到GitHub
+            # 添加到 GitHub
             add_result = await self.github_service.add_domain_to_rules(
                 target_domain, username, description
             )
@@ -1142,11 +1154,11 @@ class HandlerManager:
             self.set_user_state(user_id, "idle")
             
         except Exception as e:
-            logger.error(f"添加域名到GitHub失败: {e}")
+            logger.error(f"添加域名到 GitHub 失败: {e}")
             await query.edit_message_text("添加失败，请重试。")
     
     async def _add_domain_to_github_message(self, message, user_id: int, description: str):
-        """通过消息添加域名到GitHub"""
+        """通过消息添加域名到 GitHub"""
         try:
             user_state = self.get_user_state(user_id)
             domain_data = user_state.get("data", {})
@@ -1166,7 +1178,7 @@ class HandlerManager:
             # 显示添加中消息
             processing_msg = await message.reply_text("⏳ 正在添加域名到 GitHub 规则...")
             
-            # 添加到GitHub
+            # 添加到 GitHub
             username = message.from_user.first_name or message.from_user.username or str(message.from_user.id)
             add_result = await self.github_service.add_domain_to_rules(
                 target_domain, username, description
@@ -1207,7 +1219,7 @@ class HandlerManager:
             self.set_user_state(user_id, "idle")
             
         except Exception as e:
-            logger.error(f"添加域名到GitHub失败: {e}")
+            logger.error(f"添加域名到 GitHub 失败: {e}")
             await message.reply_text("添加失败，请重试。")
 
  
