@@ -923,10 +923,10 @@ class HandlerManager:
             result_text += f"📍 **域名：** `{domain}`\n\n"
             
             # 显示详细信息
-            detail_lines = self._format_detail_lines(check_result.get(\"details\", []))
+            detail_lines = self._format_detail_lines(check_result.get("details", []))
             if detail_lines:
-                result_text += \"?? **检查详情：**\n\"
-                result_text += f\"{detail_lines}\n\"
+                result_text += "?? **检查详情：**\n"
+                result_text += f"{detail_lines}\n"
 
             result_text += f"\n💡 **建议：** {check_result['recommendation']}\n"
             
