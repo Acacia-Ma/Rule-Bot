@@ -9,6 +9,53 @@
 
 > 不提供 Windows 支持，仅建议 Docker 部署。
 
+## 🧰 准备工作
+
+### 获取 Telegram Bot Token
+
+1) 打开 @BotFather  
+2) 发送 `/newbot`，按提示设置机器人名称与用户名  
+3) 复制并保存返回的 Token  
+
+**BotFather 推荐设置（按需）**
+
+- 群组模式必需：`/mybots` → 选择机器人 → `Bot Settings` → `Group Privacy` → `Turn off`  
+- 允许加入群组：确认 `Allow Groups` 为启用（默认开启）  
+- 可选：`/setcommands` 设置命令菜单  
+
+建议的命令列表：
+
+```text
+start - 主菜单
+help - 帮助信息
+query - 查询域名
+add - 添加规则入口
+delete - 删除规则（暂不可用）
+skip - 跳过说明
+```
+
+### 获取 GitHub Token
+
+1) 打开 GitHub → Settings → Developer settings → Personal access tokens  
+2) 二选一创建 Token（推荐 Classic 简单直观）  
+
+**Classic Token**
+
+- 选择 `Generate new token (classic)`  
+- 勾选权限：`repo`  
+
+**Fine-grained Token**
+
+- 选择 `Generate new token`  
+- 指定仓库  
+- 权限：`Contents` 设为 `Read and write`  
+
+> Token 只显示一次，请妥善保存。
+
+### 获取群组 ID（群组模式 / 群组验证需要）
+
+把 @userinfobot 加入群组，它会返回完整群组 ID（通常以 `-100` 开头）。  
+
 ## ⚡ 快速开始（Docker）
 
 1) 创建 `docker-compose.yml`
@@ -42,8 +89,8 @@ docker compose logs -f rule-bot
 
 ### 必需参数
 
-- `TELEGRAM_BOT_TOKEN`：从 @BotFather 获取
-- `GITHUB_TOKEN`：需要 `repo` 权限
+- `TELEGRAM_BOT_TOKEN`：从 @BotFather 获取（见“准备工作”）
+- `GITHUB_TOKEN`：需要 `repo` 权限（见“准备工作”）
 - `GITHUB_REPO`：格式 `用户名/仓库名`
 - `DIRECT_RULE_FILE`：规则文件路径（仓库内）
 
@@ -70,7 +117,7 @@ docker compose logs -f rule-bot
 
 </details>
 
-> 容器默认以非 root 用户运行，若挂载宿主机目录到 `/app/data`，请确保目录属主为 UID/GID 1000。
+> 容器默认以非 root 用户运行，若挂载宿主机目录到 `/app/data`，请确保目录属主为 `UID/GID=1000`。
 
 ## 🧭 使用方式
 
@@ -128,4 +175,3 @@ docker compose logs -f rule-bot
 ## 📄 许可证
 
 GPLv3
-
