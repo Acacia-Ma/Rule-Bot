@@ -167,7 +167,7 @@ class DataManager:
                 self.geosite_includes = includes
             
             logger.info(
-                "GeoSite数据加载完成，域名: %d, 关键字: %d, 正则: %d, include: %d",
+                "GeoSite数据加载完成，域名: {}, 关键字: {}, 正则: {}, include: {}",
                 len(domains),
                 len(keywords),
                 len(regex_patterns),
