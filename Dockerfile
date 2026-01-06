@@ -72,8 +72,8 @@ RUN chmod +x start.sh
 # 使用非root用户运行（安全考虑）
 RUN addgroup -g 1000 appuser && \
     adduser -D -s /bin/sh -u 1000 -G appuser appuser && \
-    chown -R appuser:appuser /app && \
-    chmod +x start.sh
+    mkdir -p /app/data && \
+    chown -R appuser:appuser /app
 USER appuser
 
 # 健康检查（暂时禁用，因为应用可能没有健康检查端点）

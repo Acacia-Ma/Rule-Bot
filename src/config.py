@@ -27,6 +27,9 @@ class Config:
         
         # 日志配置
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+        # 数据目录（可选）
+        self.DATA_DIR = os.getenv("DATA_DIR", "").strip()
         
         # 群组验证配置（用于私聊模式下验证用户是否在群组中）
         required_group_id_raw = os.getenv("REQUIRED_GROUP_ID", "").strip()

@@ -29,6 +29,7 @@ services:
       # 可选配置参数
       # - PROXY_RULE_FILE=your_proxy_rule_file_path
       # - GITHUB_COMMIT_EMAIL=your-bot-email@users.noreply.github.com
+      # - DATA_DIR=/app/data
 
       # - REQUIRED_GROUP_ID=your_group_id_here
       # - REQUIRED_GROUP_NAME=Your Group Name
@@ -66,6 +67,9 @@ EOF
 - `DATA_UPDATE_INTERVAL`: 数据更新间隔（秒）
   - 示例：`21600`
   - 默认：`21600`（6小时）
+- `DATA_DIR`: 数据目录（容器内路径）
+  - 示例：`/app/data`
+  - 默认：`/app/data`（容器内存储，重启会重新下载数据）
 - `DOH_SERVERS`: A 记录 DoH 服务器列表（逗号分隔 `name=url`）
   - 示例：`alibaba=https://dns.alidns.com/dns-query,tencent=https://doh.pub/dns-query,cloudflare=https://cloudflare-dns.com/dns-query`
   - 默认：内置国内/国际 DoH 组合
@@ -138,7 +142,7 @@ docker compose up -d
 - ✅ 环境配置：通过环境变量进行配置
 - ✅ 自动重启：容器异常时自动重启
 - ✅ 日志记录：详细的操作日志（输出到 stderr）
-- ✅ 无状态设计：使用临时目录，无需持久化存储
+- ✅ 无状态设计：默认容器内 `/app/data`，无需持久化存储
 
 ## ⚙️ 配置选项
 
@@ -728,7 +732,7 @@ Copyright (c) 2024 AetherSailor
 - 🔧 优化 Docker 构建配置，提升构建性能
 - 📝 更新 README 文档，移除无用的 volumes 配置
 - 🏗️ 改进代码结构和性能优化
-- 🔄 优化数据管理模块，使用临时目录存储
+- 🔄 优化数据管理模块，默认使用容器内数据目录
 
 ### v0.1.0
 

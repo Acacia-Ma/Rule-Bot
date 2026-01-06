@@ -33,6 +33,9 @@ services:
       # 数据更新间隔 (可选: 秒，默认 21600 = 6小时)
       # - DATA_UPDATE_INTERVAL=21600
 
+      # 数据目录 (可选: 容器内路径，默认 /app/data)
+      # - DATA_DIR=/app/data
+
       # DoH 服务器配置 (可选: 逗号分隔 name=url)
       # - DOH_SERVERS=alibaba=https://dns.alidns.com/dns-query,tencent=https://doh.pub/dns-query,cloudflare=https://cloudflare-dns.com/dns-query
       # - NS_DOH_SERVERS=cloudflare=https://cloudflare-dns.com/dns-query,google=https://dns.google/dns-query,quad9=https://dns.quad9.net/dns-query

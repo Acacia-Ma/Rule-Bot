@@ -8,6 +8,7 @@ import aiohttp
 import re
 import threading
 import time
+import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Set, List, Pattern
@@ -27,16 +28,35 @@ class DataManager:
         self.geosite_includes: List[str] = []
         self._data_lock = threading.RLock()
         self._update_lock = threading.Lock()
-        # 使用临时目录，不需要持久化
-        import tempfile
-        self.data_dir = Path(tempfile.gettempdir()) / "rule-bot"
+        # 默认使用容器内目录，不强制持久化
+        self.data_dir = self._resolve_data_dir()
+        logger.info("数据目录: {}", self.data_dir)
         self.geoip_file = self.data_dir / "geoip" / "Country-without-asn.mmdb"
         self.geosite_file = self.data_dir / "geosite" / "direct-list.txt"
         
         # 确保目录存在
-        self.data_dir.mkdir(exist_ok=True)
-        (self.data_dir / "geoip").mkdir(exist_ok=True)
-        (self.data_dir / "geosite").mkdir(exist_ok=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        (self.data_dir / "geoip").mkdir(parents=True, exist_ok=True)
+        (self.data_dir / "geosite").mkdir(parents=True, exist_ok=True)
+
+    def _resolve_data_dir(self) -> Path:
+        """解析数据目录（默认容器内路径，必要时回退到临时目录）"""
+        configured = (self.config.DATA_DIR or "").strip()
+        if configured:
+            path = Path(configured)
+            path.mkdir(parents=True, exist_ok=True)
+            return path
+
+        preferred = Path("/app/data")
+        try:
+            preferred.mkdir(parents=True, exist_ok=True)
+            return preferred
+        except Exception as e:
+            logger.warning("默认数据目录不可用: {} ({})，改用临时目录", preferred, e)
+
+        fallback = Path(tempfile.gettempdir()) / "rule-bot"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
     
     async def initialize(self):
         """初始化数据管理器"""
