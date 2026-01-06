@@ -17,6 +17,35 @@ from .config import Config
 from .data_manager import DataManager
 
 
+def _configure_logging():
+    """配置日志格式和级别"""
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    log_style = os.getenv("LOG_FORMAT", "compact").strip().lower()
+
+    if log_style in ("verbose", "full", "detail"):
+        log_format = (
+            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+            "<level>{level:<8}</level> | "
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+            "<level>{message}</level>"
+        )
+    else:
+        log_format = (
+            "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<7} | "
+            "{module:<16}:{line:<4} | {message}"
+        )
+
+    logger.remove()
+    logger.add(
+        sys.stderr,
+        level=log_level,
+        format=log_format,
+        enqueue=True,
+        backtrace=False,
+        diagnose=False
+    )
+
+
 def set_memory_limit():
     """设置内存限制为256MB（软限制，超出时给出警告）"""
     try:
@@ -93,20 +122,14 @@ def log_memory_usage():
 def main():
     """主程序入口"""
     try:
+        # 配置日志（确保早期日志也使用统一格式）
+        _configure_logging()
+
         # 设置内存限制
         set_memory_limit()
         
         # 初始化配置
         config = Config()
-        
-        # 配置日志
-        logger.remove()
-        logger.add(
-            sys.stderr,
-            level=config.LOG_LEVEL,
-            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
-        )
-        # 日志只输出到stderr，不需要文件持久化
         
         logger.info("Rule-Bot 正在启动...")
         

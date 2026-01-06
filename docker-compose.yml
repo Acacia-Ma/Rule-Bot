@@ -29,6 +29,8 @@ services:
 
       # 日志级别 (可选: DEBUG/INFO/WARNING/ERROR)
       # - LOG_LEVEL=INFO
+      # 日志格式 (可选: compact/verbose)
+      # - LOG_FORMAT=compact
 
       # 数据更新间隔 (可选: 秒，默认 21600 = 6小时)
       # - DATA_UPDATE_INTERVAL=21600

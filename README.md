@@ -64,6 +64,9 @@ EOF
 - `LOG_LEVEL`: 日志级别
   - 可选值：`DEBUG`、`INFO`、`WARNING`、`ERROR`
   - 默认：`INFO`
+- `LOG_FORMAT`: 日志格式
+  - 可选值：`compact`、`verbose`
+  - 默认：`compact`（更简洁，适合生产日志）
 - `DATA_UPDATE_INTERVAL`: 数据更新间隔（秒）
   - 示例：`21600`
   - 默认：`21600`（6小时）
