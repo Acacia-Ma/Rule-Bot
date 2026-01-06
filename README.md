@@ -69,7 +69,7 @@ EOF
   - 默认：`compact`（更简洁，适合生产日志）
 - `DATA_UPDATE_INTERVAL`: 数据更新间隔（秒）
   - 示例：`21600`
-  - 默认：`21600`（6小时）
+  - 默认：`21600`（6 小时）
 - `DATA_DIR`: 数据目录（容器内路径）
   - 示例：`/app/data`
   - 默认：`/app/data`（容器内存储，重启会重新下载数据）
@@ -283,7 +283,7 @@ services:
       # 代理规则文件路径 (可选，暂不使用)
       # - PROXY_RULE_FILE=your_proxy_rule_file_path
       
-      # GitHub Commit Email (可选: 自定义Rule-Bot的邮箱地址)
+      # GitHub Commit Email (可选: 自定义 Rule-Bot 的邮箱地址)
       # 提交者名称固定为 Rule-Bot，邮箱可自定义
       # - GITHUB_COMMIT_EMAIL=your-bot-email@users.noreply.github.com
       

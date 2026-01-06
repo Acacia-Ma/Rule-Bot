@@ -93,7 +93,7 @@ class GroupHandler:
                 return
             
             # 检查群组是否在白名单
-            logger.debug(f"[群组处理器] 检查白名单 - 群组ID: {chat.id}, 白名单: {self.config.ALLOWED_GROUP_IDS}")
+            logger.debug(f"[群组处理器] 检查白名单 - 群组 ID: {chat.id}, 白名单: {self.config.ALLOWED_GROUP_IDS}")
             if not self.is_group_allowed(chat.id):
                 logger.debug(f"[群组处理器] 群组 {chat.id} 不在白名单中，忽略消息")
                 return

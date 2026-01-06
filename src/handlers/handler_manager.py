@@ -1,6 +1,6 @@
 """
 处理器管理器
-统一管理所有Telegram消息处理逻辑
+统一管理所有 Telegram 消息处理逻辑
 """
 
 import asyncio
@@ -35,7 +35,7 @@ class HandlerManager:
         self.github_service = GitHubService(config)
         self.domain_checker = DomainChecker(self.dns_service, self.geoip_service)
         
-        # 群组服务（需要bot实例）
+        # 群组服务（需要 bot 实例）
         self.group_service = None
         if application:
             self.group_service = GroupService(config, application.bot)
@@ -214,7 +214,7 @@ class HandlerManager:
         return True, description
     
     def escape_markdown(self, text: str) -> str:
-        """转义Markdown特殊字符"""
+        """转义 Markdown 特殊字符"""
         if not text:
             return text
         
@@ -450,7 +450,7 @@ class HandlerManager:
             self.set_user_state(user.id, "idle")
             
         except Exception as e:
-            logger.error(f"处理start命令失败: {e}")
+            logger.error(f"处理 start 命令失败: {e}")
             await update.message.reply_text("服务暂时不可用，请稍后再试。")
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -510,7 +510,7 @@ class HandlerManager:
 
             await self._add_domain_to_github_message(update.message, user_id, "")
         except Exception as e:
-            logger.error(f"处理skip命令失败: {e}")
+            logger.error(f"处理 skip 命令失败: {e}")
             await update.message.reply_text("处理失败，请重试。")
 
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -670,13 +670,13 @@ class HandlerManager:
             if is_cn:
                 # .cn域名直接显示提示，不进行任何查询操作
                 result_text = f"🔍 *域名查询结果*\n\n📍 *查询域名：* `{domain}`\n\n"
-                result_text += "📋 *.cn域名说明：* 所有.cn域名默认直连，无需手动添加到规则中\n\n"
-                result_text += "💡 *.cn域名包括：*\n"
+                result_text += "📋 *.cn 域名说明：* 所有 .cn 域名默认直连，无需手动添加到规则中\n\n"
+                result_text += "💡 *.cn 域名包括：*\n"
                 result_text += "   • .cn 顶级域名\n"
                 result_text += "   • .com.cn 二级域名\n"
                 result_text += "   • .net.cn 二级域名\n"
                 result_text += "   • .org.cn 二级域名\n"
-                result_text += "   • 其他所有.cn结尾的域名\n\n"
+                result_text += "   • 其他所有 .cn 结尾的域名\n\n"
                 result_text += "✅ *状态：* 域名已默认直连，无需任何操作"
                 
                 # 显示操作按钮（不包含添加按钮）
@@ -804,8 +804,8 @@ class HandlerManager:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await processing_msg.edit_text(
-                    "❌ **.cn域名不可添加**\n\n"
-                    "📋 **.cn域名默认直连**：所有.cn结尾的域名都已默认走直连路线，无需手动添加到规则中。\n\n"
+                    "❌ **.cn 域名不可添加**\n\n"
+                    "📋 **.cn 域名默认直连**：所有 .cn 结尾的域名都已默认走直连路线，无需手动添加到规则中。\n\n"
                     "💡 如需添加其他域名，请选择下方操作：",
                     reply_markup=reply_markup,
                     parse_mode='Markdown'
@@ -826,8 +826,8 @@ class HandlerManager:
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     await processing_msg.edit_text(
-                        "❌ **.cn域名不可添加**\n\n"
-                        "📋 **.cn域名默认直连**：所有.cn结尾的域名都已默认走直连路线，无需手动添加到规则中。",
+                        "❌ **.cn 域名不可添加**\n\n"
+                        "📋 **.cn 域名默认直连**：所有 .cn 结尾的域名都已默认走直连路线，无需手动添加到规则中。",
                         reply_markup=reply_markup,
                         parse_mode='Markdown'
                     )
@@ -1043,7 +1043,7 @@ class HandlerManager:
             await query.edit_message_text(
                 f"📝 **请输入域名说明**\n\n"
                 f"📍 **域名：** `{domain}`\n\n"
-                f"请输入该域名的用途说明（限制20个汉字以内）：\n\n"
+                f"请输入该域名的用途说明（限制 20 个汉字以内）：\n\n"
                 f"例如：游戏官网、视频网站、新闻门户等",
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
@@ -1087,7 +1087,7 @@ class HandlerManager:
             await update.message.reply_text("处理失败，请重试。")
     
     async def _add_domain_to_github(self, query, user_id: int, description: str):
-        """添加域名到GitHub"""
+        """添加域名到 GitHub"""
         try:
             user_state = self.get_user_state(user_id)
             domain_data = user_state.get("data", {})
@@ -1114,7 +1114,7 @@ class HandlerManager:
             # 显示添加中消息
             await query.edit_message_text("⏳ 正在添加域名到 GitHub 规则...")
             
-            # 添加到GitHub
+            # 添加到 GitHub
             add_result = await self.github_service.add_domain_to_rules(
                 target_domain, username, description
             )
@@ -1154,11 +1154,11 @@ class HandlerManager:
             self.set_user_state(user_id, "idle")
             
         except Exception as e:
-            logger.error(f"添加域名到GitHub失败: {e}")
+            logger.error(f"添加域名到 GitHub 失败: {e}")
             await query.edit_message_text("添加失败，请重试。")
     
     async def _add_domain_to_github_message(self, message, user_id: int, description: str):
-        """通过消息添加域名到GitHub"""
+        """通过消息添加域名到 GitHub"""
         try:
             user_state = self.get_user_state(user_id)
             domain_data = user_state.get("data", {})
@@ -1178,7 +1178,7 @@ class HandlerManager:
             # 显示添加中消息
             processing_msg = await message.reply_text("⏳ 正在添加域名到 GitHub 规则...")
             
-            # 添加到GitHub
+            # 添加到 GitHub
             username = message.from_user.first_name or message.from_user.username or str(message.from_user.id)
             add_result = await self.github_service.add_domain_to_rules(
                 target_domain, username, description
@@ -1219,7 +1219,7 @@ class HandlerManager:
             self.set_user_state(user_id, "idle")
             
         except Exception as e:
-            logger.error(f"添加域名到GitHub失败: {e}")
+            logger.error(f"添加域名到 GitHub 失败: {e}")
             await message.reply_text("添加失败，请重试。")
 
  

@@ -1,5 +1,5 @@
 """
-Telegram机器人主控制器
+Telegram 机器人主控制器
 """
 
 import asyncio
@@ -18,7 +18,7 @@ from .handlers import HandlerManager, GroupHandler
 
 
 class RuleBot:
-    """Rule-Bot主控制器"""
+    """Rule-Bot 主控制器"""
     
     def __init__(self, config: Config, data_manager: DataManager):
         self.config = config
@@ -43,7 +43,7 @@ class RuleBot:
             # 创建应用
             self.app = Application.builder().token(self.config.TELEGRAM_BOT_TOKEN).build()
             
-            # 初始化处理器管理器（需要app实例）
+        # 初始化处理器管理器（需要 app 实例）
             self.handler_manager = HandlerManager(self.config, self.data_manager, self.app)
             
             # 初始化群组处理器
@@ -61,7 +61,7 @@ class RuleBot:
             async def run_bot():
                 try:
                     async with self.app:
-                        await self.handler_manager.start()  # 显式启动服务（如DNS Session）
+                        await self.handler_manager.start()  # 显式启动服务（如 DNS Session）
                         await self.app.start()
                         await self.app.updater.start_polling(
                             allowed_updates=Update.ALL_TYPES,

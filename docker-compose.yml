@@ -22,7 +22,7 @@ services:
       # ========================================
 
       # ========== 可选配置项 ==========
-      # GitHub Commit Email (可选: 自定义Rule-Bot的邮箱地址)
+      # GitHub Commit Email (可选: 自定义 Rule-Bot 的邮箱地址)
       # 提交者名称固定为 Rule-Bot，邮箱可自定义
       # 建议使用你的 Rule-Bot GitHub 账号的 noreply 邮箱
       # - GITHUB_COMMIT_EMAIL=your-bot-email@users.noreply.github.com
@@ -32,7 +32,7 @@ services:
       # 日志格式 (可选: compact/verbose)
       # - LOG_FORMAT=compact
 
-      # 数据更新间隔 (可选: 秒，默认 21600 = 6小时)
+      # 数据更新间隔 (可选: 秒，默认 21600 = 6 小时)
       # - DATA_UPDATE_INTERVAL=21600
 
       # 数据目录 (可选: 容器内路径，默认 /app/data)

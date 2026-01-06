@@ -1,6 +1,6 @@
 """
-GeoIP服务模块
-用于查询IP地址的地理位置
+GeoIP 服务模块
+用于查询 IP 地址的地理位置
 """
 
 import socket
@@ -17,7 +17,7 @@ except ImportError:
 
 
 class GeoIPService:
-    """GeoIP服务"""
+    """GeoIP 服务"""
     
     def __init__(self, geoip_file_path: str):
         self.geoip_file = Path(geoip_file_path)
@@ -25,7 +25,7 @@ class GeoIPService:
         self._load_data()
     
     def _load_data(self):
-        """加载GeoIP数据"""
+        """加载 GeoIP 数据"""
         try:
             if not GEOIP2_AVAILABLE:
                 logger.warning("geoip2 库未安装，将使用简化的 IP 范围检查")
@@ -44,9 +44,9 @@ class GeoIPService:
             logger.error(f"加载 GeoIP 数据失败: {e}")
     
     def get_country_code(self, ip: str) -> Optional[str]:
-        """获取IP的国家代码"""
+        """获取 IP 的国家代码"""
         try:
-            # 验证IP格式
+            # 验证 IP 格式
             socket.inet_aton(ip)
             
             # 如果有真实的 GeoIP2 数据库
@@ -65,11 +65,11 @@ class GeoIPService:
             return self._fallback_china_check(ip)
             
         except Exception as e:
-            logger.error(f"查询IP地理位置失败: {e}")
+            logger.error(f"查询 IP 地理位置失败: {e}")
             return None
     
     def _fallback_china_check(self, ip: str) -> Optional[str]:
-        """备用方案：简化的中国IP段检查"""
+        """备用方案：简化的中国 IP 段检查"""
         try:
             ip_parts = list(map(int, ip.split('.')))
             first_octet = ip_parts[0]
@@ -94,12 +94,12 @@ class GeoIPService:
             return None
     
     def is_china_ip(self, ip: str) -> bool:
-        """检查是否为中国IP"""
+        """检查是否为中国 IP"""
         country_code = self.get_country_code(ip)
         return country_code == "CN"
     
     def get_location_info(self, ip: str) -> Dict[str, Any]:
-        """获取IP的详细位置信息"""
+        """获取 IP 的详细位置信息"""
         try:
             country_code = self.get_country_code(ip)
             
@@ -140,7 +140,7 @@ class GeoIPService:
             }
             
         except Exception as e:
-            logger.error(f"获取IP位置信息失败: {e}")
+            logger.error(f"获取 IP 位置信息失败: {e}")
             return {
                 "ip": ip,
                 "country_code": None,

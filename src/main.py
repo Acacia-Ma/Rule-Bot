@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Rule-Bot Main Entry Point
-Telegram机器人用于管理GitHub规则文件
+Telegram 机器人用于管理 GitHub 规则文件
 """
 
 import asyncio
@@ -47,19 +47,19 @@ def _configure_logging():
 
 
 def set_memory_limit():
-    """设置内存限制为256MB（软限制，超出时给出警告）"""
+    """设置内存限制为 256 MB（软限制，超出时给出警告）"""
     try:
-        # 256MB = 256 * 1024 * 1024 bytes
+        # 256 MB = 256 * 1024 * 1024 bytes
         memory_limit = 256 * 1024 * 1024
-        # 设置软限制为256MB，硬限制为512MB（给一些缓冲空间）
+        # 设置软限制为 256 MB，硬限制为 512 MB（给一些缓冲空间）
         resource.setrlimit(resource.RLIMIT_AS, (memory_limit, memory_limit * 2))
-        logger.info(f"已设置内存软限制为 256MB，硬限制为 512MB")
+        logger.info("已设置内存软限制为 256 MB，硬限制为 512 MB")
         
         # 记录当前内存使用情况
         try:
             process = psutil.Process()
             current_memory = process.memory_info().rss
-            logger.info(f"当前内存使用: {current_memory / 1024 / 1024:.1f}MB")
+            logger.info(f"当前内存使用: {current_memory / 1024 / 1024:.1f} MB")
         except Exception as e:
             logger.warning(f"获取当前内存使用失败: {e}")
         
@@ -83,36 +83,36 @@ def log_memory_usage():
         
         # 边界检查，确保内存值合理
         if memory_mb < 0 or memory_mb > 1000:  # 如果内存值异常，记录但不处理
-            logger.warning(f"内存值异常: {memory_mb:.1f}MB，跳过处理")
+            logger.warning(f"内存值异常: {memory_mb:.1f} MB，跳过处理")
             return
         
         current_time = time.time()
-        warning_cooldown = 300  # 5分钟内不重复相同级别的警告
+        warning_cooldown = 300  # 5 分钟内不重复相同级别的警告
         
         # 检查是否接近硬限制
-        if memory_mb > 480:  # 接近512MB硬限制时紧急警告
+        if memory_mb > 480:  # 接近 512 MB 硬限制时紧急警告
             if current_time - log_memory_usage.last_warning_time > warning_cooldown or log_memory_usage.last_warning_level != 3:
-                logger.error(f"🚨 内存使用危急: {memory_mb:.1f}MB (接近512MB硬限制，可能被系统终止)")
+                logger.error(f"🚨 内存使用危急: {memory_mb:.1f} MB (接近 512 MB 硬限制，可能被系统终止)")
                 # 尝试主动释放一些内存
                 import gc
                 gc.collect()
                 logger.warning("已尝试垃圾回收释放内存")
                 log_memory_usage.last_warning_time = current_time
                 log_memory_usage.last_warning_level = 3
-        elif memory_mb > 240:  # 接近256MB软限制时警告
+        elif memory_mb > 240:  # 接近 256 MB 软限制时警告
             if current_time - log_memory_usage.last_warning_time > warning_cooldown or log_memory_usage.last_warning_level != 2:
-                logger.warning(f"⚠️ 内存使用过高: {memory_mb:.1f}MB (接近256MB软限制)")
+                logger.warning(f"⚠️ 内存使用过高: {memory_mb:.1f} MB (接近 256 MB 软限制)")
                 log_memory_usage.last_warning_time = current_time
                 log_memory_usage.last_warning_level = 2
-        elif memory_mb > 200:  # 超过200MB时提醒
+        elif memory_mb > 200:  # 超过 200 MB 时提醒
             if current_time - log_memory_usage.last_warning_time > warning_cooldown or log_memory_usage.last_warning_level != 1:
-                logger.warning(f"⚠️ 内存使用较高: {memory_mb:.1f}MB")
+                logger.warning(f"⚠️ 内存使用较高: {memory_mb:.1f} MB")
                 log_memory_usage.last_warning_time = current_time
                 log_memory_usage.last_warning_level = 1
         else:
             # 正常时只记录一次，避免刷屏
-            if current_time - log_memory_usage.last_normal_log > 3600:  # 1小时记录一次正常状态
-                logger.info(f"内存使用正常: {memory_mb:.1f}MB")
+            if current_time - log_memory_usage.last_normal_log > 3600:  # 1 小时记录一次正常状态
+                logger.info(f"内存使用正常: {memory_mb:.1f} MB")
                 log_memory_usage.last_normal_log = current_time
                 log_memory_usage.last_warning_level = 0
             
@@ -148,19 +148,19 @@ def main():
         bot = RuleBot(config, data_manager)
         
         # 启动机器人
-        logger.info("启动Telegram机器人...")
+        logger.info("启动 Telegram 机器人...")
         
-        # 启动定期内存检查（每10分钟检查一次）
+        # 启动定期内存检查（每 10 分钟检查一次）
         import threading
         
         def memory_monitor():
             while True:
                 try:
-                    time.sleep(600)  # 10分钟
+                    time.sleep(600)  # 10 分钟
                     log_memory_usage()
                 except Exception as e:
                     logger.warning(f"内存监控出错: {e}")
-                    time.sleep(60)  # 出错后等待1分钟再继续
+                    time.sleep(60)  # 出错后等待 1 分钟再继续
         
         monitor_thread = threading.Thread(target=memory_monitor, daemon=True)
         monitor_thread.start()

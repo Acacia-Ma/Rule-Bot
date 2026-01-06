@@ -1,6 +1,6 @@
 """
 数据管理模块
-负责下载和管理GeoIP、GeoSite数据
+负责下载和管理 GeoIP、GeoSite 数据
 """
 
 import asyncio
@@ -87,14 +87,14 @@ class DataManager:
             )
             
             if need_geoip:
-                logger.info("下载GeoIP数据...")
+                logger.info("下载 GeoIP 数据...")
                 await self._download_geoip()
             
             if need_geosite:
-                logger.info("下载GeoSite数据...")
+                logger.info("下载 GeoSite 数据...")
                 await self._download_geosite()
             
-            # 加载GeoSite数据到内存
+            # 加载 GeoSite 数据到内存
             await self._load_geosite_data()
             
         except Exception as e:
@@ -102,7 +102,7 @@ class DataManager:
             raise
     
     async def _download_geoip(self):
-        """下载GeoIP数据"""
+        """下载 GeoIP 数据"""
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(self.config.GEOIP_URL) as response:
@@ -110,15 +110,15 @@ class DataManager:
                         with open(self.geoip_file, 'wb') as f:
                             async for chunk in response.content.iter_chunked(8192):
                                 f.write(chunk)
-                        logger.info("GeoIP数据下载完成")
+                        logger.info("GeoIP 数据下载完成")
                     else:
                         raise Exception(f"下载失败，状态码: {response.status}")
         except Exception as e:
-            logger.error(f"GeoIP数据下载失败: {e}")
+            logger.error(f"GeoIP 数据下载失败: {e}")
             raise
     
     async def _download_geosite(self):
-        """下载GeoSite数据"""
+        """下载 GeoSite 数据"""
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(self.config.GEOSITE_URL) as response:
@@ -126,21 +126,21 @@ class DataManager:
                         with open(self.geosite_file, 'wb') as f:
                             async for chunk in response.content.iter_chunked(8192):
                                 f.write(chunk)
-                        logger.info("GeoSite数据下载完成")
+                        logger.info("GeoSite 数据下载完成")
                     else:
                         raise Exception(f"下载失败，状态码: {response.status}")
         except Exception as e:
-            logger.error(f"GeoSite数据下载失败: {e}")
+            logger.error(f"GeoSite 数据下载失败: {e}")
             raise
     
     async def _load_geosite_data(self):
-        """加载GeoSite数据到内存"""
+        """加载 GeoSite 数据到内存"""
         try:
             if not self.geosite_file.exists():
-                logger.warning("GeoSite文件不存在，跳过加载")
+                logger.warning("GeoSite 文件不存在，跳过加载")
                 return
             
-            logger.info("加载GeoSite数据到内存...")
+            logger.info("加载 GeoSite 数据到内存...")
             domains: Set[str] = set()
             keywords: List[str] = []
             regex_patterns: List[Pattern[str]] = []
@@ -176,9 +176,9 @@ class DataManager:
                         if domain:
                             domains.add(domain.lower())
                     
-                    # 每10000行输出一次进度
+                    # 每 10000 行输出一次进度
                     if line_num % 10000 == 0:
-                        logger.info(f"已处理 {line_num} 行GeoSite数据")
+                        logger.info(f"已处理 {line_num} 行 GeoSite 数据")
             
             with self._data_lock:
                 self.geosite_domains = domains
@@ -187,7 +187,7 @@ class DataManager:
                 self.geosite_includes = includes
             
             logger.info(
-                "GeoSite数据加载完成，域名: {}, 关键字: {}, 正则: {}, include: {}",
+                "GeoSite 数据加载完成，域名: {}, 关键字: {}, 正则: {}, include: {}",
                 len(domains),
                 len(keywords),
                 len(regex_patterns),
@@ -197,11 +197,11 @@ class DataManager:
                 logger.warning("检测到 GeoSite include 规则，当前未展开解析")
             
         except Exception as e:
-            logger.error(f"GeoSite数据加载失败: {e}")
+            logger.error(f"GeoSite 数据加载失败: {e}")
             raise
     
     async def is_domain_in_geosite(self, domain: str) -> bool:
-        """检查域名是否在GeoSite中"""
+        """检查域名是否在 GeoSite 中"""
         try:
             domain = domain.lower().strip()
             if not domain:
@@ -216,8 +216,8 @@ class DataManager:
             if domain in domain_set:
                 return True
             
-            # 2. 检查是否为GeoSite中域名的子域名
-            # 例如：查询 sub.example.com，检查 example.com 是否在GeoSite中
+            # 2. 检查是否为 GeoSite 中域名的子域名
+            # 例如：查询 sub.example.com，检查 example.com 是否在 GeoSite 中
             parts = domain.split('.')
             for i in range(1, len(parts)):
                 parent_domain = '.'.join(parts[i:])
@@ -232,12 +232,12 @@ class DataManager:
                 if pattern.search(domain):
                     return True
             
-            # 注意：不做反向检查，因为GeoSite通常只包含具体域名，不需要检查子域名覆盖父域名的情况
+            # 注意：不做反向检查，因为 GeoSite 通常只包含具体域名，不需要检查子域名覆盖父域名的情况
             
             return False
             
         except Exception as e:
-            logger.error(f"检查GeoSite域名失败: {e}")
+            logger.error(f"检查 GeoSite 域名失败: {e}")
             return False
     
     def _is_file_outdated(self, file_path: Path, max_age_seconds: int) -> bool:
@@ -282,7 +282,7 @@ class DataManager:
             await self._download_geoip()
             await self._download_geosite()
             
-            # 重新加载GeoSite数据
+            # 重新加载 GeoSite 数据
             await self._load_geosite_data()
             
             logger.info("定时更新完成")

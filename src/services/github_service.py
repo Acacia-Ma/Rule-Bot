@@ -1,6 +1,6 @@
 """
-GitHub服务模块
-用于操作GitHub上的规则文件
+GitHub 服务模块
+用于操作 GitHub 上的规则文件
 """
 
 import asyncio
@@ -14,7 +14,7 @@ from ..config import Config
 
 
 class GitHubService:
-    """GitHub服务"""
+    """GitHub 服务"""
     
     def __init__(self, config: Config):
         self.config = config
@@ -26,16 +26,16 @@ class GitHubService:
         """初始化仓库连接"""
         try:
             self.repo = self.github.get_repo(self.config.GITHUB_REPO)
-            logger.info(f"成功连接到GitHub仓库: {self.config.GITHUB_REPO}")
+            logger.info(f"成功连接到 GitHub 仓库: {self.config.GITHUB_REPO}")
         except Exception as e:
-            logger.error(f"连接GitHub仓库失败: {e}")
+            logger.error(f"连接 GitHub 仓库失败: {e}")
     
     def test_connection(self) -> Dict[str, Any]:
-        """测试GitHub连接和权限"""
+        """测试 GitHub 连接和权限"""
         try:
             # 测试基本连接
             user = self.github.get_user()
-            logger.info(f"GitHub连接测试成功，用户: {user.login}")
+            logger.info(f"GitHub 连接测试成功，用户: {user.login}")
             
             # 测试仓库访问
             if not self.repo:
@@ -74,7 +74,7 @@ class GitHubService:
                 }
                 
         except Exception as e:
-            logger.error(f"GitHub连接测试失败: {e}")
+            logger.error(f"GitHub 连接测试失败: {e}")
             return {
                 "success": False,
                 "error": str(e)
@@ -90,7 +90,7 @@ class GitHubService:
             logger.debug(f"成功获取文件内容: {file_path}, 长度: {len(content)} 字符")
             return content
         except GithubException as e:
-            logger.error(f"GitHub API获取文件失败: {file_path}, status={getattr(e, 'status', 'unknown')}, message={getattr(e, 'data', {}).get('message', str(e))}")
+            logger.error(f"GitHub API 获取文件失败: {file_path}, status={getattr(e, 'status', 'unknown')}, message={getattr(e, 'data', {}).get('message', str(e))}")
             return None
         except Exception as e:
             logger.error(f"获取文件内容失败: {file_path}, {type(e).__name__}: {e}", exc_info=True)
@@ -99,18 +99,18 @@ class GitHubService:
     async def get_rule_file_data(self, file_path: str) -> Optional[Dict[str, Any]]:
         """获取规则文件内容和 SHA"""
         try:
-            logger.debug(f"正在获取文件内容和SHA: {file_path}")
+            logger.debug(f"正在获取文件内容和 SHA: {file_path}")
             file_content = await asyncio.to_thread(self.repo.get_contents, file_path)
             content = base64.b64decode(file_content.content).decode('utf-8')
             return {"content": content, "sha": file_content.sha}
         except GithubException as e:
             logger.error(
-                f"GitHub API获取文件失败: {file_path}, status={getattr(e, 'status', 'unknown')}, "
+                f"GitHub API 获取文件失败: {file_path}, status={getattr(e, 'status', 'unknown')}, "
                 f"message={getattr(e, 'data', {}).get('message', str(e))}"
             )
             return None
         except Exception as e:
-            logger.error(f"获取文件内容和SHA失败: {file_path}, {type(e).__name__}: {e}", exc_info=True)
+            logger.error(f"获取文件内容和 SHA 失败: {file_path}, {type(e).__name__}: {e}", exc_info=True)
             return None
     
     async def check_domain_in_rules(self, domain: str, file_path: str = None) -> Dict[str, Any]:
@@ -169,11 +169,11 @@ class GitHubService:
                 file_path = self.config.DIRECT_RULE_FILE
 
             if not self.repo:
-                return {"success": False, "error": "GitHub仓库连接未初始化"}
+                return {"success": False, "error": "GitHub 仓库连接未初始化"}
             
             # 检查仓库连接
             if not self.repo:
-                error_msg = "GitHub仓库连接未初始化"
+                error_msg = "GitHub 仓库连接未初始化"
                 logger.error(error_msg)
                 return {"success": False, "error": error_msg}
             
@@ -302,8 +302,8 @@ class GitHubService:
         except GithubException as e:
             error_details = getattr(e, 'data', {})
             error_message = error_details.get('message', str(e)) if error_details else str(e)
-            logger.error(f"GitHub API错误: status={getattr(e, 'status', 'unknown')}, message={error_message}, data={error_details}")
-            return {"success": False, "error": f"GitHub API错误: {error_message} (状态码: {getattr(e, 'status', 'unknown')})"}
+            logger.error(f"GitHub API 错误: status={getattr(e, 'status', 'unknown')}, message={error_message}, data={error_details}")
+            return {"success": False, "error": f"GitHub API 错误: {error_message} (状态码: {getattr(e, 'status', 'unknown')})"}
         except Exception as e:
             logger.error(f"添加域名规则失败: {type(e).__name__}: {e}", exc_info=True)
             # 添加更详细的错误信息
@@ -415,8 +415,8 @@ class GitHubService:
             return {"success": False, "error": "GitHub 更新冲突，多次重试失败"}
             
         except GithubException as e:
-            logger.error(f"GitHub API错误: {e}")
-            return {"success": False, "error": f"GitHub API错误: {e.data.get('message', str(e))}"}
+            logger.error(f"GitHub API 错误: {e}")
+            return {"success": False, "error": f"GitHub API 错误: {e.data.get('message', str(e))}"}
         except Exception as e:
             logger.error(f"删除域名规则失败: {e}")
             return {"success": False, "error": str(e)}
