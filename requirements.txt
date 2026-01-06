@@ -1,5 +1,5 @@
 python-telegram-bot==22.5
-aiohttp==3.13.2
+aiohttp==3.13.3
 PyGithub==2.8.1
 dnspython==2.8.0
 loguru==0.7.3
