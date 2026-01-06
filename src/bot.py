@@ -96,7 +96,7 @@ class RuleBot:
         # 注意：需要在私聊消息处理器之前注册，使用 group 参数设置优先级
         if self.config.ALLOWED_GROUP_IDS:
             self.app.add_handler(MessageHandler(
-                filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND,
+                filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND & filters.Entity("mention"),
                 self.group_handler.handle_group_message
             ), group=0)
             logger.info(f"群组工作模式已启用，允许的群组: {self.config.ALLOWED_GROUP_IDS}")
