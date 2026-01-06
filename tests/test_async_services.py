@@ -1,16 +1,16 @@
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, patch
 import sys
 import os
 import asyncio
 import base64
 
-# Add src to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+# Add repo root to path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from services.dns_service import DNSService
-from services.github_service import GitHubService
-from config import Config
+from src.services.dns_service import DNSService
+from src.services.github_service import GitHubService
+from src.config import Config
 
 class TestServices(unittest.IsolatedAsyncioTestCase):
     async def test_dns_service_lifecycle(self):
@@ -31,7 +31,14 @@ class TestServices(unittest.IsolatedAsyncioTestCase):
     async def test_github_service_async_wrapper(self):
         print("\nTesting GitHubService async wrapper...")
         config = MagicMock(spec=Config)
-        service = GitHubService(config)
+        config.GITHUB_TOKEN = "token"
+        config.GITHUB_REPO = "test/repo"
+        config.GITHUB_COMMIT_NAME = "Rule-Bot"
+        config.GITHUB_COMMIT_EMAIL = "noreply@users.noreply.github.com"
+        config.DIRECT_RULE_FILE = "rule.list"
+
+        with patch.object(GitHubService, "_initialize_repo"):
+            service = GitHubService(config)
         service.repo = MagicMock()
         
         # Mock get_contents to return a mock file content
@@ -50,12 +57,14 @@ class TestServices(unittest.IsolatedAsyncioTestCase):
     async def test_github_service_add_domain_wrapper(self):
         print("\nTesting GitHubService add_domain wrapper...")
         config = MagicMock(spec=Config)
+        config.GITHUB_TOKEN = "token"
         config.DIRECT_RULE_FILE = "rule.list"
         config.GITHUB_REPO = "test/repo"
         config.GITHUB_COMMIT_NAME = "bot"
         config.GITHUB_COMMIT_EMAIL = "bot@test.com"
         
-        service = GitHubService(config)
+        with patch.object(GitHubService, "_initialize_repo"):
+            service = GitHubService(config)
         service.repo = MagicMock()
         
         # Mock existing content

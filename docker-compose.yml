@@ -27,6 +27,16 @@ services:
       # 建议使用你的 Rule-Bot GitHub 账号的 noreply 邮箱
       # - GITHUB_COMMIT_EMAIL=your-bot-email@users.noreply.github.com
 
+      # 日志级别 (可选: DEBUG/INFO/WARNING/ERROR)
+      # - LOG_LEVEL=INFO
+
+      # 数据更新间隔 (可选: 秒，默认 21600 = 6小时)
+      # - DATA_UPDATE_INTERVAL=21600
+
+      # DoH 服务器配置 (可选: 逗号分隔 name=url)
+      # - DOH_SERVERS=alibaba=https://dns.alidns.com/dns-query,tencent=https://doh.pub/dns-query,cloudflare=https://cloudflare-dns.com/dns-query
+      # - NS_DOH_SERVERS=cloudflare=https://cloudflare-dns.com/dns-query,google=https://dns.google/dns-query,quad9=https://dns.quad9.net/dns-query
+
       # 群组验证 (可选: 要求用户加入指定群组才能私聊使用机器人)
       # 留空则关闭此功能
       # - REQUIRED_GROUP_ID=-1002413971610

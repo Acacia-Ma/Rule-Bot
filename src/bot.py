@@ -87,6 +87,7 @@ class RuleBot:
         self.app.add_handler(CommandHandler("query", self.handler_manager.query_command))
         self.app.add_handler(CommandHandler("add", self.handler_manager.add_command))
         self.app.add_handler(CommandHandler("delete", self.handler_manager.delete_command))
+        self.app.add_handler(CommandHandler("skip", self.handler_manager.skip_command))
         
         # 回调查询处理器
         self.app.add_handler(CallbackQueryHandler(self.handler_manager.handle_callback))

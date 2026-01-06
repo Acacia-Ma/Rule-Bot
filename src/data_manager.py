@@ -5,16 +5,15 @@
 
 import asyncio
 import aiohttp
-import schedule
+import re
 import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Set, List
+from typing import Set, List, Pattern
 from loguru import logger
 
 from .config import Config
-from .utils.domain_utils import extract_domain, extract_second_level_domain
 
 
 class DataManager:
@@ -23,7 +22,11 @@ class DataManager:
     def __init__(self, config: Config):
         self.config = config
         self.geosite_domains: Set[str] = set()
-        self.geosite_index: dict = {}  # 简单的内存索引
+        self.geosite_keywords: List[str] = []
+        self.geosite_regex_patterns: List[Pattern[str]] = []
+        self.geosite_includes: List[str] = []
+        self._data_lock = threading.RLock()
+        self._update_lock = threading.Lock()
         # 使用临时目录，不需要持久化
         import tempfile
         self.data_dir = Path(tempfile.gettempdir()) / "rule-bot"
@@ -54,8 +57,14 @@ class DataManager:
         """初始下载数据"""
         try:
             # 检查是否需要下载
-            need_geoip = not self.geoip_file.exists() or self._is_file_outdated(self.geoip_file)
-            need_geosite = not self.geosite_file.exists() or self._is_file_outdated(self.geosite_file)
+            need_geoip = not self.geoip_file.exists() or self._is_file_outdated(
+                self.geoip_file,
+                self.config.DATA_UPDATE_INTERVAL
+            )
+            need_geosite = not self.geosite_file.exists() or self._is_file_outdated(
+                self.geosite_file,
+                self.config.DATA_UPDATE_INTERVAL
+            )
             
             if need_geoip:
                 logger.info("下载GeoIP数据...")
@@ -105,24 +114,42 @@ class DataManager:
             raise
     
     async def _load_geosite_data(self):
-        """加载GeoSite数据到内存并建立Redis索引"""
+        """加载GeoSite数据到内存"""
         try:
             if not self.geosite_file.exists():
                 logger.warning("GeoSite文件不存在，跳过加载")
                 return
             
             logger.info("加载GeoSite数据到内存...")
-            domains = set()
+            domains: Set[str] = set()
+            keywords: List[str] = []
+            regex_patterns: List[Pattern[str]] = []
+            includes: List[str] = []
             
             with open(self.geosite_file, 'r', encoding='utf-8') as f:
                 for line_num, line in enumerate(f, 1):
                     line = line.strip()
                     if line and not line.startswith('#'):
-                        # 提取域名
+                        domain = ""
                         if line.startswith('full:'):
                             domain = line[5:]
                         elif line.startswith('domain:'):
                             domain = line[7:]
+                        elif line.startswith('keyword:'):
+                            keyword = line[8:].strip()
+                            if keyword:
+                                keywords.append(keyword.lower())
+                        elif line.startswith('regexp:'):
+                            pattern = line[7:].strip()
+                            if pattern:
+                                try:
+                                    regex_patterns.append(re.compile(pattern, re.IGNORECASE))
+                                except re.error as e:
+                                    logger.warning(f"无效的 GeoSite 正则: {pattern} ({e})")
+                        elif line.startswith('include:') or line.startswith('geosite:'):
+                            include_item = line.split(':', 1)[1].strip()
+                            if include_item:
+                                includes.append(include_item)
                         else:
                             domain = line
                         
@@ -133,41 +160,40 @@ class DataManager:
                     if line_num % 10000 == 0:
                         logger.info(f"已处理 {line_num} 行GeoSite数据")
             
-            self.geosite_domains = domains
+            with self._data_lock:
+                self.geosite_domains = domains
+                self.geosite_keywords = keywords
+                self.geosite_regex_patterns = regex_patterns
+                self.geosite_includes = includes
             
-            # 建立内存索引以便快速查询
-            self._build_geosite_index()
-            
-            logger.info(f"GeoSite数据加载完成，共 {len(domains)} 个域名")
+            logger.info(
+                "GeoSite数据加载完成，域名: %d, 关键字: %d, 正则: %d, include: %d",
+                len(domains),
+                len(keywords),
+                len(regex_patterns),
+                len(includes)
+            )
+            if includes:
+                logger.warning("检测到 GeoSite include 规则，当前未展开解析")
             
         except Exception as e:
             logger.error(f"GeoSite数据加载失败: {e}")
             raise
     
-    def _build_geosite_index(self):
-        """建立GeoSite内存索引"""
-        try:
-            logger.info("建立GeoSite内存索引...")
-            
-            # 清空旧索引
-            self.geosite_index.clear()
-            
-            # 只为完整域名建立索引，不包括父域名
-            for domain in self.geosite_domains:
-                self.geosite_index[domain] = True
-            
-            logger.info(f"GeoSite内存索引建立完成，索引条目: {len(self.geosite_index)}")
-            
-        except Exception as e:
-            logger.error(f"建立GeoSite索引失败: {e}")
-    
     async def is_domain_in_geosite(self, domain: str) -> bool:
         """检查域名是否在GeoSite中"""
         try:
             domain = domain.lower().strip()
+            if not domain:
+                return False
+
+            with self._data_lock:
+                domain_set = self.geosite_domains
+                keywords = self.geosite_keywords
+                regex_patterns = self.geosite_regex_patterns
             
             # 1. 直接检查完整域名
-            if domain in self.geosite_index:
+            if domain in domain_set:
                 return True
             
             # 2. 检查是否为GeoSite中域名的子域名
@@ -175,7 +201,15 @@ class DataManager:
             parts = domain.split('.')
             for i in range(1, len(parts)):
                 parent_domain = '.'.join(parts[i:])
-                if parent_domain in self.geosite_index:
+                if parent_domain in domain_set:
+                    return True
+
+            for keyword in keywords:
+                if keyword and keyword in domain:
+                    return True
+
+            for pattern in regex_patterns:
+                if pattern.search(domain):
                     return True
             
             # 注意：不做反向检查，因为GeoSite通常只包含具体域名，不需要检查子域名覆盖父域名的情况
@@ -186,22 +220,21 @@ class DataManager:
             logger.error(f"检查GeoSite域名失败: {e}")
             return False
     
-    def _is_file_outdated(self, file_path: Path, hours: int = 6) -> bool:
+    def _is_file_outdated(self, file_path: Path, max_age_seconds: int) -> bool:
         """检查文件是否过期"""
         if not file_path.exists():
             return True
         
         file_time = datetime.fromtimestamp(file_path.stat().st_mtime)
-        return datetime.now() - file_time > timedelta(hours=hours)
+        return datetime.now() - file_time > timedelta(seconds=max_age_seconds)
     
     def _start_scheduled_updates(self):
         """启动定时更新任务"""
         def run_scheduler():
-            schedule.every(6).hours.do(self._update_data_sync)
-            
+            update_interval = self.config.DATA_UPDATE_INTERVAL
             while True:
-                schedule.run_pending()
-                time.sleep(60)  # 每分钟检查一次
+                time.sleep(update_interval)
+                self._update_data_sync()
         
         # 在单独线程中运行调度器
         scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
@@ -210,7 +243,15 @@ class DataManager:
     
     def _update_data_sync(self):
         """同步版本的数据更新（用于scheduler）"""
-        asyncio.create_task(self._update_data())
+        if not self._update_lock.acquire(blocking=False):
+            logger.info("已有更新任务在执行，跳过本次更新")
+            return
+        try:
+            asyncio.run(self._update_data())
+        except Exception as e:
+            logger.error(f"同步更新执行失败: {e}")
+        finally:
+            self._update_lock.release()
     
     async def _update_data(self):
         """更新数据"""

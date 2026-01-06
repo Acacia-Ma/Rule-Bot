@@ -27,8 +27,7 @@ class DNSService:
                 limit=100,  # 增加连接限制 
                 limit_per_host=10,
                 ttl_dns_cache=300,
-                use_dns_cache=True,
-                ssl=False
+                use_dns_cache=True
             )
             self.session = aiohttp.ClientSession(connector=connector)
             logger.info("DNS服务已启动，Session已初始化")
