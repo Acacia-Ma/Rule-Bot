@@ -19,4 +19,5 @@ jobs:
       - name: Enable auto-merge and delete branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch
+          GH_REPO: ${{ github.repository }}
+        run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch --repo "$GH_REPO"
