@@ -1,5 +1,5 @@
 # 多阶段构建：编译阶段
-FROM python:3.12-alpine AS builder
+FROM python:3.14-alpine AS builder
 
 # 设置构建参数
 ARG BUILDKIT_INLINE_CACHE=1
@@ -38,7 +38,7 @@ RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt \
     pip wheel --no-cache-dir --wheel-dir /wheels --only-binary=all -r requirements.txt)
 
 # 运行阶段：使用最小化镜像
-FROM python:3.12-alpine
+FROM python:3.14-alpine
 
 # 设置运行时环境变量
 ENV PYTHONUNBUFFERED=1
