@@ -32,6 +32,7 @@ class DataManager:
         self.data_dir = self._resolve_data_dir()
         logger.info("数据目录: {}", self.data_dir)
         self.geoip_file = self.data_dir / "geoip" / "Country-without-asn.mmdb"
+        self.cn_ipv4_file = self.data_dir / "geoip" / "cn-ipv4.txt"
         self.geosite_file = self.data_dir / "geosite" / "direct-list.txt"
         
         # 确保目录存在
@@ -81,6 +82,10 @@ class DataManager:
                 self.geoip_file,
                 self.config.DATA_UPDATE_INTERVAL
             )
+            need_cn_ipv4 = not self.cn_ipv4_file.exists() or self._is_file_outdated(
+                self.cn_ipv4_file,
+                self.config.DATA_UPDATE_INTERVAL
+            )
             need_geosite = not self.geosite_file.exists() or self._is_file_outdated(
                 self.geosite_file,
                 self.config.DATA_UPDATE_INTERVAL
@@ -90,6 +95,10 @@ class DataManager:
                 logger.info("下载 GeoIP 数据...")
                 await self._download_geoip()
             
+            if need_cn_ipv4:
+                logger.info("下载中国 IPv4 CIDR 数据...")
+                await self._download_cn_ipv4()
+
             if need_geosite:
                 logger.info("下载 GeoSite 数据...")
                 await self._download_geosite()
@@ -104,17 +113,25 @@ class DataManager:
     async def _download_geoip(self):
         """下载 GeoIP 数据"""
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(self.config.GEOIP_URL) as response:
-                    if response.status == 200:
-                        with open(self.geoip_file, 'wb') as f:
-                            async for chunk in response.content.iter_chunked(8192):
-                                f.write(chunk)
-                        logger.info("GeoIP 数据下载完成")
-                    else:
-                        raise Exception(f"下载失败，状态码: {response.status}")
+            await self._download_with_fallback(
+                self.config.GEOIP_URLS,
+                self.geoip_file,
+                "GeoIP"
+            )
         except Exception as e:
             logger.error(f"GeoIP 数据下载失败: {e}")
+            raise
+
+    async def _download_cn_ipv4(self):
+        """下载中国 IPv4 CIDR 数据"""
+        try:
+            await self._download_with_fallback(
+                self.config.CN_IPV4_URLS,
+                self.cn_ipv4_file,
+                "中国 IPv4 CIDR"
+            )
+        except Exception as e:
+            logger.error(f"中国 IPv4 CIDR 数据下载失败: {e}")
             raise
     
     async def _download_geosite(self):
@@ -280,6 +297,7 @@ class DataManager:
             
             # 下载新数据
             await self._download_geoip()
+            await self._download_cn_ipv4()
             await self._download_geosite()
             
             # 重新加载 GeoSite 数据
@@ -289,3 +307,23 @@ class DataManager:
             
         except Exception as e:
             logger.error(f"定时更新失败: {e}") 
+
+    async def _download_with_fallback(self, urls: List[str], dest_path: Path, label: str):
+        """按顺序尝试多个 URL 下载数据"""
+        last_error = None
+        async with aiohttp.ClientSession() as session:
+            for url in urls:
+                try:
+                    async with session.get(url) as response:
+                        if response.status == 200:
+                            with open(dest_path, 'wb') as f:
+                                async for chunk in response.content.iter_chunked(8192):
+                                    f.write(chunk)
+                            logger.info("{} 数据下载完成: {}", label, url)
+                            return
+                        last_error = f"下载失败，状态码: {response.status}"
+                        logger.warning("{} 数据下载失败: {} (状态码: {})", label, url, response.status)
+                except Exception as e:
+                    last_error = str(e)
+                    logger.warning("{} 数据下载失败: {} ({})", label, url, e)
+        raise Exception(f"{label} 数据下载失败: {last_error or '所有地址不可用'}")

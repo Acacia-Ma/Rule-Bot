@@ -4,6 +4,8 @@ GeoIP 服务模块
 """
 
 import socket
+import ipaddress
+from bisect import bisect_right
 from pathlib import Path
 from typing import Optional, Dict, Any
 from loguru import logger
@@ -19,26 +21,27 @@ except ImportError:
 class GeoIPService:
     """GeoIP 服务"""
     
-    def __init__(self, geoip_file_path: str):
+    def __init__(self, geoip_file_path: str, cn_ipv4_file_path: Optional[str] = None):
         self.geoip_file = Path(geoip_file_path)
+        self.cn_ipv4_file = Path(cn_ipv4_file_path) if cn_ipv4_file_path else None
         self.reader = None
+        self._cn_ipv4_ranges = []
+        self._cn_ipv4_range_starts = []
         self._load_data()
     
     def _load_data(self):
         """加载 GeoIP 数据"""
         try:
             if not GEOIP2_AVAILABLE:
-                logger.warning("geoip2 库未安装，将使用简化的 IP 范围检查")
-                return
-                
-            if not self.geoip_file.exists():
+                logger.warning("geoip2 库未安装，将使用中国 IPv4 CIDR 列表检查")
+            elif not self.geoip_file.exists():
                 logger.warning(f"GeoIP 数据库文件不存在: {self.geoip_file}")
-                logger.info("提示：请从 https://dev.maxmind.com/geoip/geolite2-free-geolocation-data 下载 GeoLite2-Country.mmdb")
-                return
-            
-            # 打开 MaxMind DB
-            self.reader = geoip2.database.Reader(str(self.geoip_file))
-            logger.info(f"GeoIP 数据库加载成功: {self.geoip_file}")
+            else:
+                # 打开 MaxMind DB
+                self.reader = geoip2.database.Reader(str(self.geoip_file))
+                logger.info(f"GeoIP 数据库加载成功: {self.geoip_file}")
+
+            self._load_cn_ipv4()
             
         except Exception as e:
             logger.error(f"加载 GeoIP 数据失败: {e}")
@@ -53,13 +56,20 @@ class GeoIPService:
             if self.reader:
                 try:
                     response = self.reader.country(ip)
-                    return response.country.iso_code
+                    country_code = response.country.iso_code
+                    if not country_code:
+                        country_code = (
+                            response.registered_country.iso_code
+                            or response.represented_country.iso_code
+                        )
+                    if country_code:
+                        return country_code
                 except geoip2.errors.AddressNotFoundError:
                     logger.debug(f"IP {ip} 未在 GeoIP 数据库中找到")
-                    return None
                 except Exception as e:
                     logger.warning(f"GeoIP 查询失败: {e}")
-                    return None
+                # 数据库缺失记录或查询失败时，回退到简化的中国 IP 段判断
+                return self._fallback_china_check(ip)
             
             # 回退到简化的中国 IP 段检查（仅作为备用）
             return self._fallback_china_check(ip)
@@ -69,29 +79,62 @@ class GeoIPService:
             return None
     
     def _fallback_china_check(self, ip: str) -> Optional[str]:
-        """备用方案：简化的中国 IP 段检查"""
+        """备用方案：使用中国 IPv4 CIDR 列表检查"""
         try:
-            ip_parts = list(map(int, ip.split('.')))
-            first_octet = ip_parts[0]
-            
-            # 扩展的中国 IP 段列表（第一个八位字节）
-            china_first_octets = [
-                1, 2, 14, 27, 36, 39, 42, 43, 45, 46, 47, 49,
-                58, 59, 60, 61, 101, 103, 106, 110, 111, 112, 113, 114, 115,
-                116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 130, 131,
-                133, 134, 137, 139, 140, 144, 150, 153, 157, 159, 161, 163,
-                166, 167, 168, 169, 171, 175, 180, 182, 183, 202, 203, 210,
-                211, 218, 219, 220, 221, 222, 223
-            ]
-            
-            if first_octet in china_first_octets:
+            if not self._cn_ipv4_ranges:
+                return None
+
+            ip_int = int(ipaddress.IPv4Address(ip))
+            index = bisect_right(self._cn_ipv4_range_starts, ip_int) - 1
+            if index >= 0 and ip_int <= self._cn_ipv4_ranges[index][1]:
                 return "CN"
-            
-            # 默认返回 None 表示未知
             return None
             
         except Exception:
             return None
+
+    def _load_cn_ipv4(self):
+        """加载中国 IPv4 CIDR 列表"""
+        if not self.cn_ipv4_file:
+            return
+        if not self.cn_ipv4_file.exists():
+            logger.warning(f"中国 IPv4 CIDR 文件不存在: {self.cn_ipv4_file}")
+            return
+
+        try:
+            ranges = []
+            with open(self.cn_ipv4_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    try:
+                        network = ipaddress.ip_network(line, strict=False)
+                    except ValueError:
+                        logger.debug(f"无效的 CIDR 记录: {line}")
+                        continue
+                    if isinstance(network, ipaddress.IPv4Network):
+                        start = int(network.network_address)
+                        end = int(network.broadcast_address)
+                        ranges.append((start, end))
+
+            if not ranges:
+                logger.warning("中国 IPv4 CIDR 数据为空，回退检查不可用")
+                return
+
+            ranges.sort(key=lambda item: item[0])
+            merged = []
+            for start, end in ranges:
+                if not merged or start > merged[-1][1] + 1:
+                    merged.append([start, end])
+                else:
+                    merged[-1][1] = max(merged[-1][1], end)
+
+            self._cn_ipv4_ranges = [(start, end) for start, end in merged]
+            self._cn_ipv4_range_starts = [start for start, _ in self._cn_ipv4_ranges]
+            logger.info("中国 IPv4 CIDR 数据加载完成: {} 段", len(self._cn_ipv4_ranges))
+        except Exception as e:
+            logger.error(f"加载中国 IPv4 CIDR 数据失败: {e}")
     
     def is_china_ip(self, ip: str) -> bool:
         """检查是否为中国 IP"""

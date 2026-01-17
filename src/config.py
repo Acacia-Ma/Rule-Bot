@@ -49,8 +49,17 @@ class Config:
         self.ALLOWED_GROUP_IDS = self._parse_group_ids(os.getenv("ALLOWED_GROUP_IDS", ""))
         
         # 数据源URL
-        # 使用 Loyalsoldier GeoIP 数据库（针对中国 IP 优化）
-        self.GEOIP_URL = "https://raw.githubusercontent.com/Loyalsoldier/geoip/release/Country-without-asn.mmdb"
+        # 使用 Aethersailor GeoIP 数据库
+        self.GEOIP_URLS = [
+            "https://gcore.jsdelivr.net/gh/Aethersailor/geoip@release/Country-without-asn.mmdb",
+            "https://testingcf.jsdelivr.net/gh/Aethersailor/geoip@release/Country-without-asn.mmdb",
+            "https://raw.githubusercontent.com/Aethersailor/geoip/release/Country-without-asn.mmdb",
+        ]
+        self.CN_IPV4_URLS = [
+            "https://raw.githubusercontent.com/Aethersailor/geoip/refs/heads/release/text/cn-ipv4.txt",
+            "https://gcore.jsdelivr.net/gh/Aethersailor/geoip@release/text/cn-ipv4.txt",
+            "https://testingcf.jsdelivr.net/gh/Aethersailor/geoip@release/text/cn-ipv4.txt",
+        ]
         self.GEOSITE_URL = "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/refs/heads/release/direct-list.txt"
         
         # DoH服务器配置

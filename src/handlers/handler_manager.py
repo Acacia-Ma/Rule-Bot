@@ -31,7 +31,10 @@ class HandlerManager:
         
         # 初始化服务
         self.dns_service = DNSService(config.DOH_SERVERS, config.NS_DOH_SERVERS)
-        self.geoip_service = GeoIPService(str(data_manager.geoip_file))
+        self.geoip_service = GeoIPService(
+            str(data_manager.geoip_file),
+            str(data_manager.cn_ipv4_file)
+        )
         self.github_service = GitHubService(config)
         self.domain_checker = DomainChecker(self.dns_service, self.geoip_service)
         
