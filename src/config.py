@@ -47,6 +47,10 @@ class Config:
         # 群组工作模式配置（允许机器人在这些群组中直接响应 @提及）
         # 支持逗号分隔的多个群组 ID，例如：-1001234567890,-1009876543210
         self.ALLOWED_GROUP_IDS = self._parse_group_ids(os.getenv("ALLOWED_GROUP_IDS", ""))
+
+        # 管理员配置（Telegram 用户 ID 列表）
+        # 支持逗号分隔的多个用户 ID，例如：123456789,987654321
+        self.ADMIN_USER_IDS = self._parse_user_ids(os.getenv("ADMIN_USER_IDS", ""))
         
         # 数据源URL
         # 使用 Aethersailor GeoIP 数据库
@@ -119,6 +123,29 @@ class Config:
             except ValueError:
                 logger.warning(f"无效的 ALLOWED_GROUP_IDS: {raw_id}")
         return group_ids
+
+    def _parse_user_ids(self, ids_str: str) -> list:
+        """解析用户 ID 列表
+
+        Args:
+            ids_str: 逗号分隔的用户 ID 字符串
+
+        Returns:
+            用户 ID 整数列表
+        """
+        if not ids_str.strip():
+            return []
+
+        user_ids = []
+        for raw_id in ids_str.split(","):
+            raw_id = raw_id.strip()
+            if not raw_id:
+                continue
+            try:
+                user_ids.append(int(raw_id))
+            except ValueError:
+                logger.warning(f"无效的 ADMIN_USER_IDS: {raw_id}")
+        return user_ids
 
     def _parse_required_group_id(self, group_id_raw: str) -> Optional[int]:
         """解析必需群组 ID"""
