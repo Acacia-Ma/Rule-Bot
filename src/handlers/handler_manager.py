@@ -472,6 +472,24 @@ class HandlerManager:
             parse_mode='Markdown'
         )
 
+    async def id_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理 /id 命令，返回用户 ID"""
+        try:
+            if not await self.check_group_membership(update):
+                return
+
+            user = update.effective_user
+            username = user.username or user.first_name or "未知"
+            text = (
+                "🆔 **您的 Telegram 用户 ID：** "
+                f"`{user.id}`\n"
+                f"👤 **用户名：** @{self.escape_markdown(username)}"
+            )
+            await update.message.reply_text(text, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"处理 id 命令失败: {e}")
+            await update.message.reply_text("处理失败，请重试。")
+
     async def query_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /query 命令"""
         user_id = update.effective_user.id
@@ -1035,6 +1053,7 @@ class HandlerManager:
         """处理管理员权限强制添加回调"""
         try:
             if not self.is_admin(user_id):
+                logger.warning(f"管理员权限操作被拒绝: user_id={user_id}, data={data}")
                 return
 
             domain = data.split("|", 1)[1].strip() if "|" in data else ""

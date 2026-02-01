@@ -3,6 +3,7 @@
 """
 
 import os
+import re
 from typing import Optional, Dict
 from loguru import logger
 
@@ -51,6 +52,10 @@ class Config:
         # 管理员配置（Telegram 用户 ID 列表）
         # 支持逗号分隔的多个用户 ID，例如：123456789,987654321
         self.ADMIN_USER_IDS = self._parse_user_ids(os.getenv("ADMIN_USER_IDS", ""))
+        if self.ADMIN_USER_IDS:
+            logger.info(f"已加载管理员 IDs: {self.ADMIN_USER_IDS}")
+        else:
+            logger.info("未配置管理员 IDs（ADMIN_USER_IDS）")
         
         # 数据源URL
         # 使用 Aethersailor GeoIP 数据库
@@ -137,8 +142,8 @@ class Config:
             return []
 
         user_ids = []
-        for raw_id in ids_str.split(","):
-            raw_id = raw_id.strip()
+        parts = [part for part in re.split(r"[,\s;]+", ids_str.strip()) if part]
+        for raw_id in parts:
             if not raw_id:
                 continue
             try:
