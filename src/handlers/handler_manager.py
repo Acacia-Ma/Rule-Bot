@@ -964,11 +964,12 @@ class HandlerManager:
             # 根据检查结果决定下一步
             keyboard = []
             
+            should_reject = self.domain_checker.should_reject(check_result)
             if self.domain_checker.should_add_directly(check_result):
                 # 符合条件，提供添加选项
                 keyboard.append([InlineKeyboardButton("✅ 确认添加", callback_data="confirm_add_yes")])
                 keyboard.append([InlineKeyboardButton("❌ 取消添加", callback_data="confirm_add_no")])
-            elif self.domain_checker.should_reject(check_result):
+            elif should_reject:
                 # 不符合条件，拒绝添加
                 result_text += "\n❌ **不符合添加条件，无法添加到直连规则。**"
                 if self.is_admin(user_id):
@@ -989,6 +990,9 @@ class HandlerManager:
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
+
+            if should_reject:
+                self.set_user_state(user_id, "waiting_add_domain")
             
         except Exception as e:
             logger.error(f"添加域名输入处理失败: {e}")
@@ -1026,7 +1030,8 @@ class HandlerManager:
             # 根据检查结果决定下一步
             keyboard = []
             
-            if not self.domain_checker.should_reject(check_result):
+            should_reject = self.domain_checker.should_reject(check_result)
+            if not should_reject:
                 keyboard.append([InlineKeyboardButton("✅ 确认添加", callback_data="confirm_add_yes")])
                 keyboard.append([InlineKeyboardButton("❌ 取消添加", callback_data="confirm_add_no")])
             else:
@@ -1044,6 +1049,9 @@ class HandlerManager:
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
+
+            if should_reject:
+                self.set_user_state(user_id, "waiting_add_domain")
             
         except Exception as e:
             logger.error(f"处理添加域名回调失败: {e}")
