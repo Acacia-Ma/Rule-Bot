@@ -719,8 +719,8 @@ class HandlerManager:
                 
                 await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
                 
-                # 重置用户状态
-                self.set_user_state(user_id, "idle")
+                # 保持查询模式，便于继续输入域名
+                self.set_user_state(user_id, "waiting_query_domain")
                 return
             
             # 非.cn域名继续正常查询流程
@@ -790,8 +790,8 @@ class HandlerManager:
             
             await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
             
-            # 重置用户状态
-            self.set_user_state(user_id, "idle")
+            # 保持查询模式，便于继续输入域名
+            self.set_user_state(user_id, "waiting_query_domain")
             
         except Exception as e:
             logger.error(f"域名查询失败: {e}")
@@ -820,8 +820,8 @@ class HandlerManager:
                     reply_markup=reply_markup,
                     parse_mode='Markdown'
                 )
-                # 重置用户状态
-                self.set_user_state(user_id, "idle")
+                # 保持添加模式，便于继续输入域名
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 检查是否为.cn域名
@@ -841,8 +841,8 @@ class HandlerManager:
                     reply_markup=reply_markup,
                     parse_mode='Markdown'
                 )
-                # 重置用户状态
-                self.set_user_state(user_id, "idle")
+                # 保持添加模式，便于继续输入域名
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 提取二级域名用于添加规则
@@ -864,8 +864,8 @@ class HandlerManager:
                     )
                 else:
                     await processing_msg.edit_text("❌ 无效的域名格式，请重新输入。")
-                # 重置用户状态
-                self.set_user_state(user_id, "idle")
+                # 保持添加模式，便于继续输入域名
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 显示提取的二级域名信息
@@ -894,7 +894,7 @@ class HandlerManager:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
-                self.set_user_state(user_id, "idle")
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 检查二级域名规则
@@ -915,7 +915,7 @@ class HandlerManager:
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
-                    self.set_user_state(user_id, "idle")
+                    self.set_user_state(user_id, "waiting_add_domain")
                     return
             
             # 检查GeoSite
@@ -932,7 +932,7 @@ class HandlerManager:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
-                self.set_user_state(user_id, "idle")
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 2. 进行域名检查
@@ -1164,7 +1164,7 @@ class HandlerManager:
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await query.edit_message_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
-            self.set_user_state(user_id, "idle")
+            self.set_user_state(user_id, "waiting_add_domain")
 
         except Exception as e:
             logger.error(f"处理管理员权限添加失败: {e}")
@@ -1186,7 +1186,7 @@ class HandlerManager:
                     reply_markup=reply_markup,
                     parse_mode='Markdown'
                 )
-                self.set_user_state(user_id, "idle")
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 确认添加
@@ -1318,8 +1318,8 @@ class HandlerManager:
             
             await query.edit_message_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
             
-            # 重置用户状态
-            self.set_user_state(user_id, "idle")
+            # 保持添加模式，便于继续输入域名
+            self.set_user_state(user_id, "waiting_add_domain")
             
         except Exception as e:
             logger.error(f"添加域名到 GitHub 失败: {e}")
@@ -1383,8 +1383,8 @@ class HandlerManager:
             
             await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
             
-            # 重置用户状态
-            self.set_user_state(user_id, "idle")
+            # 保持添加模式，便于继续输入域名
+            self.set_user_state(user_id, "waiting_add_domain")
             
         except Exception as e:
             logger.error(f"添加域名到 GitHub 失败: {e}")
