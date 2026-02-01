@@ -1130,19 +1130,19 @@ class HandlerManager:
                 _, remaining = self.check_user_add_limit(user_id)
                 
                 result_text = f"✅ **域名添加成功！**\n\n"
-                result_text += f"📍 **域名：** `{self.escape_markdown(target_domain)}`\n"
+                result_text += f"📍 **域名：** `{target_domain}`\n"
                 result_text += f"👤 **提交者：** @{self.escape_markdown(username)}\n"
                 if description:
                     result_text += f"📝 **说明：** {self.escape_markdown(description)}\n"
-                result_text += f"📂 **文件路径：** `{self.escape_markdown(add_result['file_path'])}`\n"
+                result_text += f"📂 **文件路径：** `{add_result['file_path']}`\n"
                 if add_result.get('commit_url'):
                     result_text += f"🔗 **查看提交：** [点击查看]({add_result['commit_url']})\n"
                     result_text += f"📝 **Commit ID：** `{add_result.get('commit_sha', '')[:8]}`\n"
-                result_text += f"💬 **提交信息：** `{self.escape_markdown(add_result['commit_message'])}`\n"
+                result_text += f"💬 **提交信息：** `{add_result['commit_message']}`\n"
                 result_text += f"\n💡 本小时内还可添加 {remaining} 个域名"
             else:
                 result_text = f"❌ **域名添加失败**\n\n"
-                result_text += f"📍 **域名：** `{self.escape_markdown(target_domain)}`\n"
+                result_text += f"📍 **域名：** `{target_domain}`\n"
                 result_text += f"❌ **错误：** {self.escape_markdown(add_result.get('error', '未知错误'))}"
             
             keyboard = [
@@ -1195,19 +1195,19 @@ class HandlerManager:
                 _, remaining = self.check_user_add_limit(user_id)
                 
                 result_text = f"✅ **域名添加成功！**\n\n"
-                result_text += f"📍 **域名：** `{self.escape_markdown(target_domain)}`\n"
+                result_text += f"📍 **域名：** `{target_domain}`\n"
                 result_text += f"👤 **提交者：** @{self.escape_markdown(username)}\n"
                 if description:
                     result_text += f"📝 **说明：** {self.escape_markdown(description)}\n"
-                result_text += f"📂 **文件路径：** `{self.escape_markdown(add_result['file_path'])}`\n"
+                result_text += f"📂 **文件路径：** `{add_result['file_path']}`\n"
                 if add_result.get('commit_url'):
                     result_text += f"🔗 **查看提交：** [点击查看]({add_result['commit_url']})\n"
                     result_text += f"📝 **Commit ID：** `{add_result.get('commit_sha', '')[:8]}`\n"
-                result_text += f"💬 **提交信息：** `{self.escape_markdown(add_result['commit_message'])}`\n"
+                result_text += f"💬 **提交信息：** `{add_result['commit_message']}`\n"
                 result_text += f"\n💡 本小时内还可添加 {remaining} 个域名"
             else:
                 result_text = f"❌ **域名添加失败**\n\n"
-                result_text += f"📍 **域名：** `{self.escape_markdown(target_domain)}`\n"
+                result_text += f"📍 **域名：** `{target_domain}`\n"
                 result_text += f"❌ **错误：** {self.escape_markdown(add_result.get('error', '未知错误'))}"
             
             keyboard = [
