@@ -161,8 +161,14 @@ class GitHubService:
             logger.error(f"检查域名规则失败: {e}")
             return {"exists": False, "error": str(e)}
     
-    async def add_domain_to_rules(self, domain: str, user_name: str, description: str = "", 
-                                 file_path: str = None) -> Dict[str, Any]:
+    async def add_domain_to_rules(
+        self,
+        domain: str,
+        user_name: str,
+        description: str = "",
+        file_path: str = None,
+        force_add: bool = False
+    ) -> Dict[str, Any]:
         """添加域名到规则文件"""
         try:
             if not file_path:
@@ -228,10 +234,16 @@ class GitHubService:
                     beijing_tz = timezone(timedelta(hours=8))
                     current_date = datetime.now(beijing_tz).strftime("%Y-%m-%d %H:%M:%S")
                     
-                    if description:
-                        comment = f"# {description} / add by Telegram user: {user_name} / Date: {current_date}"
+                    if force_add:
+                        if description:
+                            comment = f"# {description} / force add by Admin: {user_name} / Date: {current_date}"
+                        else:
+                            comment = f"# force add by Admin: {user_name} / Date: {current_date}"
                     else:
-                        comment = f"# add by Telegram user: {user_name} / Date: {current_date}"
+                        if description:
+                            comment = f"# {description} / add by Telegram user: {user_name} / Date: {current_date}"
+                        else:
+                            comment = f"# add by Telegram user: {user_name} / Date: {current_date}"
                     
                     rule = f"DOMAIN-SUFFIX,{domain}"
                     
@@ -243,7 +255,13 @@ class GitHubService:
                     new_content = '\n'.join(lines)
                     
                     # 遵循 Conventional Commits 规范
-                    commit_title = f"feat(rules): add direct domain {domain} by Telegram Bot (Telegram user: {user_name})"
+                    if force_add:
+                        commit_title = (
+                            f"feat(rules): force add direct domain {domain} by Admin "
+                            f"(Telegram user: {user_name})"
+                        )
+                    else:
+                        commit_title = f"feat(rules): add direct domain {domain} by Telegram Bot (Telegram user: {user_name})"
                     commit_body = description if description else ""
                     full_commit_message = commit_title
                     if commit_body and commit_body.strip():

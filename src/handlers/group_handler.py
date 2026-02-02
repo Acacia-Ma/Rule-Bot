@@ -6,7 +6,7 @@
 from typing import Optional
 from loguru import logger
 
-from telegram import Update, Message
+from telegram import Update, Message, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from ..config import Config
@@ -220,6 +220,7 @@ class GroupHandler:
             result = await self.handler_manager.check_and_add_domain_auto(domain, username)
             
             # 根据结果回复
+            reply_markup = None
             if result["action"] == "added":
                 # 记录用户添加历史
                 self.handler_manager.record_user_add(user_id)
@@ -241,13 +242,22 @@ class GroupHandler:
                 result_text = f"❌ **无法添加域名**\n\n"
                 result_text += f"📍 **域名：** `{domain}`\n"
                 result_text += f"📋 {result['message']}"
+                if self.handler_manager.is_admin(user_id):
+                    result_text += "\n\n🛡️ **管理员可使用权限按钮强制添加。**"
+                    keyboard = [
+                        [InlineKeyboardButton(
+                            "🛡️ 管理员权限添加",
+                            callback_data=self.handler_manager.get_admin_force_add_callback(domain)
+                        )]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
                 
             else:  # error
                 result_text = f"❌ **处理失败**\n\n"
                 result_text += f"📍 **域名：** `{domain}`\n"
                 result_text += f"❌ {result['message']}"
-            
-            await processing_msg.edit_text(result_text, parse_mode='Markdown')
+
+            await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
             
         except Exception as e:
             logger.error(f"处理域名请求失败: {e}")

@@ -1,6 +1,6 @@
 services:
   rule-bot:
-    build: .
+    image: aethersailor/rule-bot:latest
     container_name: rule-bot
     restart: unless-stopped
     environment:
@@ -52,6 +52,12 @@ services:
       # 支持逗号分隔多个群组 ID，例如：-1001234567890,-1009876543210
       # 留空则关闭此功能（仅支持私聊模式）
       # - ALLOWED_GROUP_IDS=-1001234567890,-1009876543210
+
+      # 管理员配置 (可选: 指定管理员用户 ID，拥有强制添加域名的权限)
+      # 支持逗号分隔多个 Telegram 用户 ID，例如：123456789,987654321
+      # 管理员可以强制添加被系统检测拒绝的域名
+      # 留空则关闭此功能
+      # - ADMIN_USER_IDS=123456789,987654321
       # ========================================
 
       # ========== 系统配置 ==========

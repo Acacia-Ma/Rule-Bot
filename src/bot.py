@@ -84,6 +84,7 @@ class RuleBot:
         # 命令处理器
         self.app.add_handler(CommandHandler("start", self.handler_manager.start_command))
         self.app.add_handler(CommandHandler("help", self.handler_manager.help_command))
+        self.app.add_handler(CommandHandler("id", self.handler_manager.id_command))
         self.app.add_handler(CommandHandler("query", self.handler_manager.query_command))
         self.app.add_handler(CommandHandler("add", self.handler_manager.add_command))
         self.app.add_handler(CommandHandler("delete", self.handler_manager.delete_command))

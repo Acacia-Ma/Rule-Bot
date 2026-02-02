@@ -197,6 +197,14 @@ class HandlerManager:
         """记录用户添加操作"""
         current_time = time.time()
         self.user_add_history[user_id].append(current_time)
+
+    def is_admin(self, user_id: int) -> bool:
+        """检查是否管理员"""
+        return user_id in self.config.ADMIN_USER_IDS
+
+    def get_admin_force_add_callback(self, domain: str) -> str:
+        """构建管理员权限添加的回调数据"""
+        return f"admin_force_add|{domain}"
     
     def validate_description(self, description: str) -> tuple[bool, str]:
         """验证域名说明
@@ -464,6 +472,24 @@ class HandlerManager:
             parse_mode='Markdown'
         )
 
+    async def id_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理 /id 命令，返回用户 ID"""
+        try:
+            if not await self.check_group_membership(update):
+                return
+
+            user = update.effective_user
+            username = user.username or user.first_name or "未知"
+            text = (
+                "🆔 **您的 Telegram 用户 ID：** "
+                f"`{user.id}`\n"
+                f"👤 **用户名：** @{self.escape_markdown(username)}"
+            )
+            await update.message.reply_text(text, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"处理 id 命令失败: {e}")
+            await update.message.reply_text("处理失败，请重试。")
+
     async def query_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /query 命令"""
         user_id = update.effective_user.id
@@ -547,6 +573,8 @@ class HandlerManager:
                 await self._handle_confirm_add_callback(query, user_id, data)
             elif data == "skip_description":
                 await self._handle_skip_description(query, user_id)
+            elif data.startswith("admin_force_add|"):
+                await self._handle_admin_force_add_callback(query, user_id, data)
             else:
                 await query.edit_message_text("未知操作")
                 
@@ -691,8 +719,8 @@ class HandlerManager:
                 
                 await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
                 
-                # 重置用户状态
-                self.set_user_state(user_id, "idle")
+                # 保持查询模式，便于继续输入域名
+                self.set_user_state(user_id, "waiting_query_domain")
                 return
             
             # 非.cn域名继续正常查询流程
@@ -762,8 +790,8 @@ class HandlerManager:
             
             await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
             
-            # 重置用户状态
-            self.set_user_state(user_id, "idle")
+            # 保持查询模式，便于继续输入域名
+            self.set_user_state(user_id, "waiting_query_domain")
             
         except Exception as e:
             logger.error(f"域名查询失败: {e}")
@@ -792,8 +820,8 @@ class HandlerManager:
                     reply_markup=reply_markup,
                     parse_mode='Markdown'
                 )
-                # 重置用户状态
-                self.set_user_state(user_id, "idle")
+                # 保持添加模式，便于继续输入域名
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 检查是否为.cn域名
@@ -813,8 +841,8 @@ class HandlerManager:
                     reply_markup=reply_markup,
                     parse_mode='Markdown'
                 )
-                # 重置用户状态
-                self.set_user_state(user_id, "idle")
+                # 保持添加模式，便于继续输入域名
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 提取二级域名用于添加规则
@@ -836,8 +864,8 @@ class HandlerManager:
                     )
                 else:
                     await processing_msg.edit_text("❌ 无效的域名格式，请重新输入。")
-                # 重置用户状态
-                self.set_user_state(user_id, "idle")
+                # 保持添加模式，便于继续输入域名
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 显示提取的二级域名信息
@@ -866,7 +894,7 @@ class HandlerManager:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
-                self.set_user_state(user_id, "idle")
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 检查二级域名规则
@@ -887,7 +915,7 @@ class HandlerManager:
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
-                    self.set_user_state(user_id, "idle")
+                    self.set_user_state(user_id, "waiting_add_domain")
                     return
             
             # 检查GeoSite
@@ -904,7 +932,7 @@ class HandlerManager:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
-                self.set_user_state(user_id, "idle")
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 2. 进行域名检查
@@ -936,13 +964,22 @@ class HandlerManager:
             # 根据检查结果决定下一步
             keyboard = []
             
+            should_reject = self.domain_checker.should_reject(check_result)
             if self.domain_checker.should_add_directly(check_result):
                 # 符合条件，提供添加选项
                 keyboard.append([InlineKeyboardButton("✅ 确认添加", callback_data="confirm_add_yes")])
                 keyboard.append([InlineKeyboardButton("❌ 取消添加", callback_data="confirm_add_no")])
-            elif self.domain_checker.should_reject(check_result):
+            elif should_reject:
                 # 不符合条件，拒绝添加
                 result_text += "\n❌ **不符合添加条件，无法添加到直连规则。**"
+                if self.is_admin(user_id):
+                    result_text += "\n🛡️ **管理员权限：** 可强制添加"
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            "🛡️ 管理员权限添加",
+                            callback_data=self.get_admin_force_add_callback(domain)
+                        )
+                    ])
                 keyboard.append([InlineKeyboardButton("➕ 添加其他域名", callback_data="add_direct_rule")])
             else:
                 # 默认情况（理论上不会到这里）
@@ -953,6 +990,9 @@ class HandlerManager:
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
+
+            if should_reject:
+                self.set_user_state(user_id, "waiting_add_domain")
             
         except Exception as e:
             logger.error(f"添加域名输入处理失败: {e}")
@@ -990,19 +1030,152 @@ class HandlerManager:
             # 根据检查结果决定下一步
             keyboard = []
             
-            if not self.domain_checker.should_reject(check_result):
+            should_reject = self.domain_checker.should_reject(check_result)
+            if not should_reject:
                 keyboard.append([InlineKeyboardButton("✅ 确认添加", callback_data="confirm_add_yes")])
                 keyboard.append([InlineKeyboardButton("❌ 取消添加", callback_data="confirm_add_no")])
             else:
                 result_text += "\n❌ **不符合添加条件，无法添加到直连规则。**"
+                if self.is_admin(user_id):
+                    result_text += "\n🛡️ **管理员权限：** 可强制添加"
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            "🛡️ 管理员权限添加",
+                            callback_data=self.get_admin_force_add_callback(domain)
+                        )
+                    ])
             
             keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
+
+            if should_reject:
+                self.set_user_state(user_id, "waiting_add_domain")
             
         except Exception as e:
             logger.error(f"处理添加域名回调失败: {e}")
+            await query.edit_message_text("操作失败，请重试。")
+
+    async def _handle_admin_force_add_callback(self, query, user_id: int, data: str):
+        """处理管理员权限强制添加回调"""
+        try:
+            if not self.is_admin(user_id):
+                logger.warning(f"管理员权限操作被拒绝: user_id={user_id}, data={data}")
+                return
+
+            domain = data.split("|", 1)[1].strip() if "|" in data else ""
+            if not domain:
+                await query.edit_message_text("❌ 域名数据丢失，请重新开始。")
+                return
+
+            domain = extract_second_level_domain_for_rules(domain)
+            if not domain:
+                await query.edit_message_text("❌ 无效的域名格式，请重新开始。")
+                return
+
+            if is_cn_domain(domain):
+                await query.edit_message_text(
+                    "ℹ️ **.cn 域名默认直连，无需手动添加。**",
+                    parse_mode='Markdown'
+                )
+                return
+
+            # 检查用户添加频率限制
+            can_add, _ = self.check_user_add_limit(user_id)
+            if not can_add:
+                keyboard = [
+                    [InlineKeyboardButton("🔍 查询域名", callback_data="query_domain")],
+                    [InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(
+                    "⚠️ **添加频率限制**\n\n"
+                    f"您在当前小时内已达到添加上限（{self.MAX_ADDS_PER_HOUR}个域名）。\n\n"
+                    "🕐 请等待一小时后再尝试添加新域名。\n\n"
+                    "💡 此限制是为了防止系统滥用，感谢您的理解。",
+                    reply_markup=reply_markup,
+                    parse_mode='Markdown'
+                )
+                return
+
+            # 防重复检查
+            github_result = await self.github_service.check_domain_in_rules(domain)
+            if github_result.get("exists"):
+                result_text = f"❌ **域名已存在于规则中**\n\n"
+                result_text += f"📍 **域名：** `{domain}`\n\n"
+                result_text += "📋 **找到的规则：**\n"
+                for match in github_result.get("matches", []):
+                    result_text += f"   • 第{match['line']}行: {match['rule']}\n"
+
+                keyboard = [
+                    [InlineKeyboardButton("➕ 添加其他域名", callback_data="add_direct_rule")],
+                    [InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
+                return
+
+            in_geosite = await self.data_manager.is_domain_in_geosite(domain)
+            if in_geosite:
+                result_text = f"❌ **域名已存在于 GEOSITE:CN 中**\n\n"
+                result_text += f"📍 **域名：** `{domain}`\n\n"
+                result_text += "该域名已在 GEOSITE:CN 规则中，不需要重复添加。"
+
+                keyboard = [
+                    [InlineKeyboardButton("➕ 添加其他域名", callback_data="add_direct_rule")],
+                    [InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
+                return
+
+            await query.edit_message_text("⏳ 正在执行管理员权限添加...")
+            check_result = await self.domain_checker.check_domain_comprehensive(domain)
+            if "error" in check_result:
+                await query.edit_message_text(f"❌ 域名检查失败：{check_result['error']}")
+                return
+
+            target_domain = self.domain_checker.get_target_domain_to_add(check_result) or domain
+            username = query.from_user.first_name or query.from_user.username or str(query.from_user.id)
+
+            add_result = await self.github_service.add_domain_to_rules(
+                target_domain,
+                username,
+                "",
+                force_add=True
+            )
+
+            if add_result.get("success"):
+                self.record_user_add(user_id)
+                _, remaining = self.check_user_add_limit(user_id)
+
+                result_text = "✅ **域名添加成功（管理员权限）！**\n\n"
+                result_text += f"📍 **域名：** `{target_domain}`\n"
+                result_text += f"👤 **管理员：** @{self.escape_markdown(username)}\n"
+                result_text += "🛡️ **添加方式：** 管理员权限强制添加\n"
+                result_text += f"📂 **文件路径：** `{add_result['file_path']}`\n"
+                if add_result.get('commit_url'):
+                    result_text += f"🔗 **查看提交：** [点击查看]({add_result['commit_url']})\n"
+                    result_text += f"📝 **Commit ID：** `{add_result.get('commit_sha', '')[:8]}`\n"
+                result_text += f"💬 **提交信息：** `{add_result['commit_message']}`\n"
+                result_text += f"\n💡 本小时内还可添加 {remaining} 个域名"
+            else:
+                result_text = f"❌ **域名添加失败**\n\n"
+                result_text += f"📍 **域名：** `{target_domain}`\n"
+                result_text += f"❌ **错误：** {self.escape_markdown(add_result.get('error', '未知错误'))}"
+
+            keyboard = [
+                [InlineKeyboardButton("➕ 继续添加", callback_data="add_direct_rule")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
+            self.set_user_state(user_id, "waiting_add_domain")
+
+        except Exception as e:
+            logger.error(f"处理管理员权限添加失败: {e}")
             await query.edit_message_text("操作失败，请重试。")
     
     async def _handle_confirm_add_callback(self, query, user_id: int, data: str):
@@ -1021,7 +1194,7 @@ class HandlerManager:
                     reply_markup=reply_markup,
                     parse_mode='Markdown'
                 )
-                self.set_user_state(user_id, "idle")
+                self.set_user_state(user_id, "waiting_add_domain")
                 return
             
             # 确认添加
@@ -1130,19 +1303,19 @@ class HandlerManager:
                 _, remaining = self.check_user_add_limit(user_id)
                 
                 result_text = f"✅ **域名添加成功！**\n\n"
-                result_text += f"📍 **域名：** `{self.escape_markdown(target_domain)}`\n"
+                result_text += f"📍 **域名：** `{target_domain}`\n"
                 result_text += f"👤 **提交者：** @{self.escape_markdown(username)}\n"
                 if description:
                     result_text += f"📝 **说明：** {self.escape_markdown(description)}\n"
-                result_text += f"📂 **文件路径：** `{self.escape_markdown(add_result['file_path'])}`\n"
+                result_text += f"📂 **文件路径：** `{add_result['file_path']}`\n"
                 if add_result.get('commit_url'):
                     result_text += f"🔗 **查看提交：** [点击查看]({add_result['commit_url']})\n"
                     result_text += f"📝 **Commit ID：** `{add_result.get('commit_sha', '')[:8]}`\n"
-                result_text += f"💬 **提交信息：** `{self.escape_markdown(add_result['commit_message'])}`\n"
+                result_text += f"💬 **提交信息：** `{add_result['commit_message']}`\n"
                 result_text += f"\n💡 本小时内还可添加 {remaining} 个域名"
             else:
                 result_text = f"❌ **域名添加失败**\n\n"
-                result_text += f"📍 **域名：** `{self.escape_markdown(target_domain)}`\n"
+                result_text += f"📍 **域名：** `{target_domain}`\n"
                 result_text += f"❌ **错误：** {self.escape_markdown(add_result.get('error', '未知错误'))}"
             
             keyboard = [
@@ -1153,8 +1326,8 @@ class HandlerManager:
             
             await query.edit_message_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
             
-            # 重置用户状态
-            self.set_user_state(user_id, "idle")
+            # 保持添加模式，便于继续输入域名
+            self.set_user_state(user_id, "waiting_add_domain")
             
         except Exception as e:
             logger.error(f"添加域名到 GitHub 失败: {e}")
@@ -1195,19 +1368,19 @@ class HandlerManager:
                 _, remaining = self.check_user_add_limit(user_id)
                 
                 result_text = f"✅ **域名添加成功！**\n\n"
-                result_text += f"📍 **域名：** `{self.escape_markdown(target_domain)}`\n"
+                result_text += f"📍 **域名：** `{target_domain}`\n"
                 result_text += f"👤 **提交者：** @{self.escape_markdown(username)}\n"
                 if description:
                     result_text += f"📝 **说明：** {self.escape_markdown(description)}\n"
-                result_text += f"📂 **文件路径：** `{self.escape_markdown(add_result['file_path'])}`\n"
+                result_text += f"📂 **文件路径：** `{add_result['file_path']}`\n"
                 if add_result.get('commit_url'):
                     result_text += f"🔗 **查看提交：** [点击查看]({add_result['commit_url']})\n"
                     result_text += f"📝 **Commit ID：** `{add_result.get('commit_sha', '')[:8]}`\n"
-                result_text += f"💬 **提交信息：** `{self.escape_markdown(add_result['commit_message'])}`\n"
+                result_text += f"💬 **提交信息：** `{add_result['commit_message']}`\n"
                 result_text += f"\n💡 本小时内还可添加 {remaining} 个域名"
             else:
                 result_text = f"❌ **域名添加失败**\n\n"
-                result_text += f"📍 **域名：** `{self.escape_markdown(target_domain)}`\n"
+                result_text += f"📍 **域名：** `{target_domain}`\n"
                 result_text += f"❌ **错误：** {self.escape_markdown(add_result.get('error', '未知错误'))}"
             
             keyboard = [
@@ -1218,8 +1391,8 @@ class HandlerManager:
             
             await processing_msg.edit_text(result_text, reply_markup=reply_markup, parse_mode='Markdown')
             
-            # 重置用户状态
-            self.set_user_state(user_id, "idle")
+            # 保持添加模式，便于继续输入域名
+            self.set_user_state(user_id, "waiting_add_domain")
             
         except Exception as e:
             logger.error(f"添加域名到 GitHub 失败: {e}")
