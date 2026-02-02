@@ -58,28 +58,33 @@ skip - 跳过说明
 
 ## ⚡ 快速开始（Docker）
 
-1) 创建 `docker-compose.yml`
+1) 创建工作目录并下载配置文件
 
-```yaml
-services:
-  rule-bot:
-    image: aethersailor/rule-bot:latest
-    container_name: rule-bot
-    restart: unless-stopped
-    environment:
-      - TELEGRAM_BOT_TOKEN=你的机器人 Token
-      - GITHUB_TOKEN=你的 GitHub Token
-      - GITHUB_REPO=your_username/your_repository
-      - DIRECT_RULE_FILE=rule/Custom_Direct.list
+```bash
+mkdir -p /opt/Rule-Bot && cd /opt/Rule-Bot
+wget https://raw.githubusercontent.com/Aethersailor/Rule-Bot/main/docker-compose.yml
 ```
 
-2) 启动
+1) 编辑配置文件
+
+```bash
+vim docker-compose.yml
+```
+
+修改以下必填参数（去掉 `#` 注释，填入你的实际值）：
+
+- `TELEGRAM_BOT_TOKEN`
+- `GITHUB_TOKEN`
+- `GITHUB_REPO`
+- `DIRECT_RULE_FILE`
+
+1) 启动容器
 
 ```bash
 docker compose up -d
 ```
 
-3) 查看日志
+1) 查看日志
 
 ```bash
 docker compose logs -f rule-bot
@@ -113,6 +118,7 @@ docker compose logs -f rule-bot
 | `REQUIRED_GROUP_NAME` | 群组验证名称 | 空 |
 | `REQUIRED_GROUP_LINK` | 群组验证链接 | 空 |
 | `ALLOWED_GROUP_IDS` | 群组模式允许的群组 ID，逗号分隔 | 空 |
+| `ADMIN_USER_IDS` | 管理员 Telegram 用户 ID，逗号分隔 | 空 |
 | `TZ` | 时区 | `Asia/Shanghai` |
 
 </details>
@@ -142,6 +148,15 @@ docker compose logs -f rule-bot
 
 同时配置 `REQUIRED_GROUP_ID/NAME/LINK` 后生效，未通过或校验失败会拒绝访问（失败即拒绝）。
 
+### 管理员模式（ADMIN_USER_IDS）
+
+配置 `ADMIN_USER_IDS` 后，指定的管理员用户可以：
+
+- 强制添加被系统检测拒绝的域名
+- 获取调试辅助信息
+
+> 通过 @userinfobot 获取你的 Telegram 用户 ID。
+
 ## 📌 规则逻辑（简版）
 
 1) 解析域名并提取二级域名  
@@ -160,6 +175,7 @@ docker compose logs -f rule-bot
 ## 🧩 常见问题
 
 **群组不响应消息**
+
 1. 关闭 Privacy Mode  
 2. 重新添加机器人到群组  
 3. 仅在消息中 @ 机器人  
