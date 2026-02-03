@@ -15,6 +15,7 @@ from telegram.ext import (
 from .config import Config
 from .data_manager import DataManager
 from .handlers import HandlerManager, GroupHandler
+from .utils.metrics import EXPORTER
 
 
 class RuleBot:
@@ -26,15 +27,20 @@ class RuleBot:
         self.app: Optional[Application] = None
         self.handler_manager = None  # 延迟初始化
         self.group_handler = None  # 群组处理器
+        self._metrics_task = None
     
     async def stop(self):
         """停止机器人"""
         logger.info("正在停止机器人...")
         if self.handler_manager:
             await self.handler_manager.stop()
+        if self._metrics_task:
+            await EXPORTER.stop()
         if self.app:
             await self.app.stop()
             await self.app.shutdown()
+        if self.data_manager:
+            await self.data_manager.close()
         logger.info("机器人已停止")
 
     def start(self):
@@ -63,6 +69,7 @@ class RuleBot:
                     async with self.app:
                         await self.handler_manager.start()  # 显式启动服务（如 DNS Session）
                         await self.app.start()
+                        self._metrics_task = EXPORTER.start()
                         await self.app.updater.start_polling(
                             allowed_updates=Update.ALL_TYPES,
                             drop_pending_updates=True  # 丢弃待处理的更新，避免发送旧消息
