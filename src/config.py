@@ -31,6 +31,34 @@ class Config:
 
         # 数据目录（可选）
         self.DATA_DIR = os.getenv("DATA_DIR", "").strip()
+
+        # 性能与缓存配置
+        self.DNS_CACHE_TTL = self._parse_int_env("DNS_CACHE_TTL", 60, min_value=0)
+        self.DNS_CACHE_SIZE = self._parse_int_env("DNS_CACHE_SIZE", 1024, min_value=0)
+        self.NS_CACHE_TTL = self._parse_int_env("NS_CACHE_TTL", 300, min_value=0)
+        self.NS_CACHE_SIZE = self._parse_int_env("NS_CACHE_SIZE", 512, min_value=0)
+        self.DNS_MAX_CONCURRENCY = self._parse_int_env("DNS_MAX_CONCURRENCY", 20, min_value=1)
+        self.DNS_CONN_LIMIT = self._parse_int_env("DNS_CONN_LIMIT", 30, min_value=1)
+        self.DNS_CONN_LIMIT_PER_HOST = self._parse_int_env("DNS_CONN_LIMIT_PER_HOST", 10, min_value=1)
+        self.DNS_TIMEOUT_TOTAL = self._parse_int_env("DNS_TIMEOUT_TOTAL", 10, min_value=1)
+        self.DNS_TIMEOUT_CONNECT = self._parse_int_env("DNS_TIMEOUT_CONNECT", 3, min_value=1)
+
+        self.GEOSITE_CACHE_TTL = self._parse_int_env("GEOSITE_CACHE_TTL", 3600, min_value=0)
+        self.GEOSITE_CACHE_SIZE = self._parse_int_env("GEOSITE_CACHE_SIZE", 2048, min_value=0)
+        self.GEOIP_CACHE_TTL = self._parse_int_env("GEOIP_CACHE_TTL", 21600, min_value=0)
+        self.GEOIP_CACHE_SIZE = self._parse_int_env("GEOIP_CACHE_SIZE", 4096, min_value=0)
+
+        self.GITHUB_FILE_CACHE_TTL = self._parse_int_env("GITHUB_FILE_CACHE_TTL", 60, min_value=0)
+        self.GITHUB_FILE_CACHE_SIZE = self._parse_int_env("GITHUB_FILE_CACHE_SIZE", 4, min_value=0)
+
+        # Metrics 配置
+        self.METRICS_ENABLED = self._parse_bool_env("METRICS_ENABLED", False)
+        self.METRICS_EXPORT_PATH = os.getenv("METRICS_EXPORT_PATH", "/tmp/rule-bot-metrics.json")
+        self.METRICS_EXPORT_INTERVAL = self._parse_int_env("METRICS_EXPORT_INTERVAL", 30, min_value=1)
+        self.METRICS_RESET_ON_EXPORT = self._parse_bool_env("METRICS_RESET_ON_EXPORT", False)
+
+        # 内存修剪（glibc malloc_trim）
+        self.MEMORY_TRIM_ENABLED = self._parse_bool_env("MEMORY_TRIM_ENABLED", True)
         
         # 群组验证配置（用于私聊模式下验证用户是否在群组中）
         required_group_id_raw = os.getenv("REQUIRED_GROUP_ID", "").strip()
@@ -201,3 +229,32 @@ class Config:
             return defaults
 
         return servers
+
+    def _parse_int_env(
+        self,
+        key: str,
+        default: int,
+        min_value: Optional[int] = None,
+        max_value: Optional[int] = None
+    ) -> int:
+        raw = os.getenv(key, "").strip()
+        if not raw:
+            return default
+        try:
+            value = int(raw)
+        except ValueError:
+            logger.warning(f"无效的 {key}: {raw}，使用默认值 {default}")
+            return default
+        if min_value is not None and value < min_value:
+            logger.warning(f"{key} 小于最小值 {min_value}，使用默认值 {default}")
+            return default
+        if max_value is not None and value > max_value:
+            logger.warning(f"{key} 大于最大值 {max_value}，使用默认值 {default}")
+            return default
+        return value
+
+    def _parse_bool_env(self, key: str, default: bool = False) -> bool:
+        raw = os.getenv(key, "").strip().lower()
+        if not raw:
+            return default
+        return raw in ("1", "true", "yes", "on")
