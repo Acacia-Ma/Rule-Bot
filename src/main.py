@@ -121,6 +121,44 @@ def log_memory_usage():
     except Exception as e:
         logger.warning(f"获取内存使用情况失败: {e}")
 
+async def _run():
+    """异步主流程（全进程单事件循环）"""
+    # 初始化配置
+    config = Config()
+    
+    logger.info("Rule-Bot 正在启动...")
+    
+    # 初始化数据管理器（与机器人运行保持同一事件循环）
+    data_manager = DataManager(config)
+    await data_manager.initialize()
+    
+    # 记录数据加载后的内存使用
+    log_memory_usage()
+    trim_memory("初始化完成后内存修剪")
+    
+    # 初始化机器人
+    bot = RuleBot(config, data_manager)
+    
+    # 启动机器人
+    logger.info("启动 Telegram 机器人...")
+    
+    # 启动定期内存检查（每 10 分钟检查一次）
+    import threading
+
+    def memory_monitor():
+        while True:
+            try:
+                time.sleep(600)  # 10 分钟
+                log_memory_usage()
+            except Exception as e:
+                logger.warning(f"内存监控出错: {e}")
+                time.sleep(60)  # 出错后等待 1 分钟再继续
+
+    monitor_thread = threading.Thread(target=memory_monitor, daemon=True)
+    monitor_thread.start()
+
+    await bot.start()
+
 def main():
     """主程序入口"""
     try:
@@ -129,47 +167,9 @@ def main():
 
         # 设置内存限制
         set_memory_limit()
-        
-        # 初始化配置
-        config = Config()
-        
-        logger.info("Rule-Bot 正在启动...")
-        
-        # 初始化数据管理器（在新的事件循环中）
-        async def init_data():
-            data_manager = DataManager(config)
-            await data_manager.initialize()
-            return data_manager
-        
-        data_manager = asyncio.run(init_data())
-        
-        # 记录数据加载后的内存使用
-        log_memory_usage()
-        trim_memory("初始化完成后内存修剪")
-        
-        # 初始化机器人
-        bot = RuleBot(config, data_manager)
-        
-        # 启动机器人
-        logger.info("启动 Telegram 机器人...")
-        
-        # 启动定期内存检查（每 10 分钟检查一次）
-        import threading
-        
-        def memory_monitor():
-            while True:
-                try:
-                    time.sleep(600)  # 10 分钟
-                    log_memory_usage()
-                except Exception as e:
-                    logger.warning(f"内存监控出错: {e}")
-                    time.sleep(60)  # 出错后等待 1 分钟再继续
-        
-        monitor_thread = threading.Thread(target=memory_monitor, daemon=True)
-        monitor_thread.start()
-        
-        bot.start()
-        
+
+        asyncio.run(_run())
+
     except KeyboardInterrupt:
         logger.info("收到停止信号，正在关闭...")
     except Exception as e:

@@ -33,6 +33,7 @@ class DataManager:
         self.geosite_includes: List[str] = []
         self._data_lock = threading.RLock()
         self._update_lock = threading.Lock()
+        self._scheduler_task: Optional[asyncio.Task] = None
         self._session: Optional[aiohttp.ClientSession] = None
         self._geosite_cache = TTLCache(
             config.GEOSITE_CACHE_SIZE,
@@ -89,9 +90,18 @@ class DataManager:
         return self._session
 
     async def close(self):
-        """关闭共享 Session"""
+        """关闭后台任务与共享 Session"""
+        if self._scheduler_task and not self._scheduler_task.done():
+            self._scheduler_task.cancel()
+            try:
+                await self._scheduler_task
+            except asyncio.CancelledError:
+                pass
+        self._scheduler_task = None
+
         if self._session and not self._session.closed:
             await self._session.close()
+        self._session = None
     
     async def initialize(self):
         """初始化数据管理器"""
@@ -330,26 +340,33 @@ class DataManager:
     
     def _start_scheduled_updates(self):
         """启动定时更新任务"""
-        def run_scheduler():
-            update_interval = self.config.DATA_UPDATE_INTERVAL
-            while True:
-                time.sleep(update_interval)
-                self._update_data_sync()
-        
-        # 在单独线程中运行调度器
-        scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-        scheduler_thread.start()
+        if self._scheduler_task and not self._scheduler_task.done():
+            logger.info("定时更新任务已在运行")
+            return
+        self._scheduler_task = asyncio.create_task(self._scheduled_update_loop())
         logger.info("定时更新任务已启动")
-    
-    def _update_data_sync(self):
-        """同步版本的数据更新（用于scheduler）"""
+
+    async def _scheduled_update_loop(self):
+        """异步定时更新循环（与主事件循环一致）"""
+        update_interval = self.config.DATA_UPDATE_INTERVAL
+        while True:
+            try:
+                await asyncio.sleep(update_interval)
+                await self._update_data_guarded()
+            except asyncio.CancelledError:
+                logger.info("定时更新任务已停止")
+                raise
+            except Exception as e:
+                logger.error(f"定时更新循环异常: {e}")
+                await asyncio.sleep(1)
+
+    async def _update_data_guarded(self):
+        """带并发保护的数据更新"""
         if not self._update_lock.acquire(blocking=False):
             logger.info("已有更新任务在执行，跳过本次更新")
             return
         try:
-            asyncio.run(self._update_data())
-        except Exception as e:
-            logger.error(f"同步更新执行失败: {e}")
+            await self._update_data()
         finally:
             self._update_lock.release()
     
