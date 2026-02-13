@@ -19,19 +19,26 @@ def _env_bool(key: str, default: bool = True) -> bool:
 
 
 MEMORY_TRIM_ENABLED = _env_bool("MEMORY_TRIM_ENABLED", True)
+_LIBC = None
+_HAS_MALLOC_TRIM = False
+
+try:
+    libc_name = ctypes.util.find_library("c")
+    if libc_name:
+        _LIBC = ctypes.CDLL(libc_name)
+        _HAS_MALLOC_TRIM = hasattr(_LIBC, "malloc_trim")
+except Exception:
+    _LIBC = None
+    _HAS_MALLOC_TRIM = False
 
 
 def trim_memory(reason: str = "") -> bool:
     if not MEMORY_TRIM_ENABLED:
         return False
+    if not _LIBC or not _HAS_MALLOC_TRIM:
+        return False
     try:
-        libc_name = ctypes.util.find_library("c")
-        if not libc_name:
-            return False
-        libc = ctypes.CDLL(libc_name)
-        if not hasattr(libc, "malloc_trim"):
-            return False
-        result = libc.malloc_trim(0)
+        result = _LIBC.malloc_trim(0)
         if result and reason:
             logger.debug(f"已触发内存回收: {reason}")
         return bool(result)

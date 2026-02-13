@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from time import monotonic
-from typing import Dict, Generic, Optional, Tuple, TypeVar
+from typing import Generic, Optional, TypeVar
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -16,7 +16,7 @@ class TTLCache(Generic[K, V]):
     def __init__(self, maxsize: int, ttl_seconds: float):
         self.maxsize = max(0, int(maxsize))
         self.ttl_seconds = float(ttl_seconds)
-        self._data: "OrderedDict[K, Tuple[float, V]]" = OrderedDict()
+        self._data: OrderedDict[K, tuple[float, V]] = OrderedDict()
 
     def get(self, key: K) -> Optional[V]:
         if self.maxsize <= 0:

@@ -421,14 +421,16 @@ class DataManager:
         last_error = None
         session = await self._get_session()
         current_meta = self._load_meta(meta_path)
-        headers = {}
+        conditional_headers = {}
         if current_meta.get("etag"):
-            headers["If-None-Match"] = current_meta["etag"]
+            conditional_headers["If-None-Match"] = current_meta["etag"]
         if current_meta.get("last_modified"):
-            headers["If-Modified-Since"] = current_meta["last_modified"]
+            conditional_headers["If-Modified-Since"] = current_meta["last_modified"]
 
-        for url in urls:
+        for idx, url in enumerate(urls):
             try:
+                # 仅在首选源使用条件请求头，避免不同镜像之间复用 ETag/Last-Modified。
+                headers = conditional_headers if idx == 0 else {}
                 start_ts = time.perf_counter()
                 async with session.get(url, headers=headers) as response:
                     if response.status == 304:

@@ -14,6 +14,8 @@ import time
 from types import SimpleNamespace
 from typing import List
 
+from loguru import logger
+
 from src.data_manager import DataManager
 from src.services.dns_service import DNSService
 from src.services.geoip_service import GeoIPService
@@ -123,10 +125,13 @@ async def worker(
 ):
     while time.time() < end_time:
         domain = random.choice(domains)
-        await data_manager.is_domain_in_geosite(domain)
-        await checker.check_domain_comprehensive(domain)
-        if github_service:
-            await github_service.check_domain_in_rules(domain)
+        try:
+            await data_manager.is_domain_in_geosite(domain)
+            await checker.check_domain_comprehensive(domain)
+            if github_service:
+                await github_service.check_domain_in_rules(domain)
+        except Exception as e:
+            logger.warning("worker {} 处理域名 {} 失败: {}", worker_id, domain, e)
         await asyncio.sleep(pause)
 
 

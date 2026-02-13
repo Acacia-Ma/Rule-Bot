@@ -148,7 +148,8 @@ class MetricsExporter:
             try:
                 await self._task
             except asyncio.CancelledError:
-                pass
+                # stop() 主动取消任务，CancelledError 属于预期。
+                logger.debug("metrics 导出任务在停止时被取消")
 
     async def _run(self) -> None:
         while True:

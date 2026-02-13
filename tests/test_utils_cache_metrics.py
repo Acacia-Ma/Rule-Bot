@@ -22,7 +22,7 @@ class TestTTLCache(unittest.TestCase):
     def test_ttl_cache_expire(self):
         cache = TTLCache(maxsize=2, ttl_seconds=0.01)
         cache.set("a", 1)
-        time.sleep(0.02)
+        time.sleep(0.05)
         self.assertIsNone(cache.get("a"))
 
 
