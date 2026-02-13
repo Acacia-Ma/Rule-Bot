@@ -120,6 +120,28 @@ docker compose logs -f rule-bot
 | `ALLOWED_GROUP_IDS` | 群组模式允许的群组 ID，逗号分隔 | 空 |
 | `ADMIN_USER_IDS` | 管理员 Telegram 用户 ID，逗号分隔 | 空 |
 | `TZ` | 时区 | `Asia/Shanghai` |
+| `DNS_CACHE_TTL` | DNS A 记录缓存秒数 | `60` |
+| `DNS_CACHE_SIZE` | DNS A 记录缓存上限 | `1024` |
+| `NS_CACHE_TTL` | DNS NS 记录缓存秒数 | `300` |
+| `NS_CACHE_SIZE` | DNS NS 记录缓存上限 | `512` |
+| `DNS_MAX_CONCURRENCY` | DNS 并发限制 | `20` |
+| `DNS_CONN_LIMIT` | DNS 全局连接池上限 | `30` |
+| `DNS_CONN_LIMIT_PER_HOST` | DNS 单主机连接上限 | `10` |
+| `DNS_TIMEOUT_TOTAL` | DNS 请求总超时 | `10` |
+| `DNS_TIMEOUT_CONNECT` | DNS 连接超时 | `3` |
+| `GEOSITE_CACHE_TTL` | GeoSite 查询缓存秒数 | `3600` |
+| `GEOSITE_CACHE_SIZE` | GeoSite 查询缓存上限 | `2048` |
+| `GEOIP_CACHE_TTL` | GeoIP 缓存秒数 | `21600` |
+| `GEOIP_CACHE_SIZE` | GeoIP 缓存上限 | `4096` |
+| `GITHUB_FILE_CACHE_TTL` | 规则文件缓存秒数 | `60` |
+| `GITHUB_FILE_CACHE_SIZE` | 规则文件缓存上限 | `4` |
+| `METRICS_ENABLED` | 开启 metrics 导出 | `false` |
+| `METRICS_EXPORT_PATH` | metrics 输出路径 | `/tmp/rule-bot-metrics.json` |
+| `METRICS_EXPORT_INTERVAL` | metrics 导出间隔秒数 | `30` |
+| `METRICS_RESET_ON_EXPORT` | 导出后清零 | `false` |
+| `MEMORY_SOFT_LIMIT_MB` | 进程软限制 MB | `256` |
+| `MEMORY_HARD_LIMIT_MB` | 进程硬限制 MB | `512` |
+| `MEMORY_TRIM_ENABLED` | 启用内存修剪 | `true` |
 
 </details>
 
@@ -187,6 +209,41 @@ docker compose logs -f rule-bot
 
 - Python 3.12+
 - `pip install -r requirements.txt`
+
+## 🧪 1C1G 运行建议
+
+建议对容器设置内存上限与 CPU 配额，避免全机抖动：
+
+```yaml
+services:
+  rule-bot:
+    mem_limit: 256m
+    mem_reservation: 128m
+    cpus: "0.5"
+```
+
+如果你使用的是 Swarm 模式，可改用 `deploy.resources` 语法。
+
+**Swap/RSS 观测**
+
+```bash
+pid=$(pgrep -f "python -m src.main" | head -n 1)
+grep -E "VmRSS|VmSize|VmSwap" /proc/$pid/status
+```
+
+**性能采样（需开启 metrics 导出）**
+
+```bash
+export METRICS_ENABLED=1
+export METRICS_EXPORT_INTERVAL=30
+python tools/profile_runtime.py --process-name "python -m src.main" --duration 300 --interval 5
+```
+
+**10 分钟压力模拟**
+
+```bash
+python tools/stress_sim.py --duration 600 --concurrency 4 --pause 0.5
+```
 
 ## 📄 许可证
 

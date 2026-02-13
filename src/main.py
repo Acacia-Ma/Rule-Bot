@@ -15,6 +15,7 @@ from loguru import logger
 from .bot import RuleBot
 from .config import Config
 from .data_manager import DataManager
+from .utils.memory import trim_memory
 
 
 def _configure_logging():
@@ -47,13 +48,14 @@ def _configure_logging():
 
 
 def set_memory_limit():
-    """设置内存限制为 256 MB（软限制，超出时给出警告）"""
+    """设置内存限制（默认软限制 256 MB，硬限制 512 MB）"""
     try:
-        # 256 MB = 256 * 1024 * 1024 bytes
-        memory_limit = 256 * 1024 * 1024
-        # 设置软限制为 256 MB，硬限制为 512 MB（给一些缓冲空间）
-        resource.setrlimit(resource.RLIMIT_AS, (memory_limit, memory_limit * 2))
-        logger.info("已设置内存软限制为 256 MB，硬限制为 512 MB")
+        soft_mb = int(os.getenv("MEMORY_SOFT_LIMIT_MB", "256"))
+        hard_mb = int(os.getenv("MEMORY_HARD_LIMIT_MB", str(soft_mb * 2)))
+        memory_soft = soft_mb * 1024 * 1024
+        memory_hard = hard_mb * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (memory_soft, memory_hard))
+        logger.info(f"已设置内存软限制为 {soft_mb} MB，硬限制为 {hard_mb} MB")
         
         # 记录当前内存使用情况
         try:
@@ -119,6 +121,44 @@ def log_memory_usage():
     except Exception as e:
         logger.warning(f"获取内存使用情况失败: {e}")
 
+async def _run():
+    """异步主流程（全进程单事件循环）"""
+    # 初始化配置
+    config = Config()
+    
+    logger.info("Rule-Bot 正在启动...")
+    
+    # 初始化数据管理器（与机器人运行保持同一事件循环）
+    data_manager = DataManager(config)
+    await data_manager.initialize()
+    
+    # 记录数据加载后的内存使用
+    log_memory_usage()
+    trim_memory("初始化完成后内存修剪")
+    
+    # 初始化机器人
+    bot = RuleBot(config, data_manager)
+    
+    # 启动机器人
+    logger.info("启动 Telegram 机器人...")
+    
+    # 启动定期内存检查（每 10 分钟检查一次）
+    import threading
+
+    def memory_monitor():
+        while True:
+            try:
+                time.sleep(600)  # 10 分钟
+                log_memory_usage()
+            except Exception as e:
+                logger.warning(f"内存监控出错: {e}")
+                time.sleep(60)  # 出错后等待 1 分钟再继续
+
+    monitor_thread = threading.Thread(target=memory_monitor, daemon=True)
+    monitor_thread.start()
+
+    await bot.start()
+
 def main():
     """主程序入口"""
     try:
@@ -127,46 +167,9 @@ def main():
 
         # 设置内存限制
         set_memory_limit()
-        
-        # 初始化配置
-        config = Config()
-        
-        logger.info("Rule-Bot 正在启动...")
-        
-        # 初始化数据管理器（在新的事件循环中）
-        async def init_data():
-            data_manager = DataManager(config)
-            await data_manager.initialize()
-            return data_manager
-        
-        data_manager = asyncio.run(init_data())
-        
-        # 记录数据加载后的内存使用
-        log_memory_usage()
-        
-        # 初始化机器人
-        bot = RuleBot(config, data_manager)
-        
-        # 启动机器人
-        logger.info("启动 Telegram 机器人...")
-        
-        # 启动定期内存检查（每 10 分钟检查一次）
-        import threading
-        
-        def memory_monitor():
-            while True:
-                try:
-                    time.sleep(600)  # 10 分钟
-                    log_memory_usage()
-                except Exception as e:
-                    logger.warning(f"内存监控出错: {e}")
-                    time.sleep(60)  # 出错后等待 1 分钟再继续
-        
-        monitor_thread = threading.Thread(target=memory_monitor, daemon=True)
-        monitor_thread.start()
-        
-        bot.start()
-        
+
+        asyncio.run(_run())
+
     except KeyboardInterrupt:
         logger.info("收到停止信号，正在关闭...")
     except Exception as e:

@@ -5,16 +5,21 @@
 
 import asyncio
 import aiohttp
+import hashlib
+import json
 import re
 import threading
 import time
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Set, List, Pattern
+from typing import Set, List, Pattern, Optional, Tuple, Dict, Any
 from loguru import logger
 
 from .config import Config
+from .utils.cache import TTLCache
+from .utils.metrics import METRICS
+from .utils.memory import trim_memory
 
 
 class DataManager:
@@ -28,12 +33,22 @@ class DataManager:
         self.geosite_includes: List[str] = []
         self._data_lock = threading.RLock()
         self._update_lock = threading.Lock()
+        self._scheduler_task: Optional[asyncio.Task] = None
+        self._session: Optional[aiohttp.ClientSession] = None
+        self._geosite_cache = TTLCache(
+            config.GEOSITE_CACHE_SIZE,
+            config.GEOSITE_CACHE_TTL
+        )
+        self._geosite_stamp: Optional[Tuple[int, int]] = None
         # 默认使用容器内目录，不强制持久化
         self.data_dir = self._resolve_data_dir()
         logger.info("数据目录: {}", self.data_dir)
         self.geoip_file = self.data_dir / "geoip" / "Country-without-asn.mmdb"
         self.cn_ipv4_file = self.data_dir / "geoip" / "cn-ipv4.txt"
         self.geosite_file = self.data_dir / "geosite" / "direct-list.txt"
+        self.geoip_meta = self.geoip_file.with_suffix(self.geoip_file.suffix + ".meta.json")
+        self.cn_ipv4_meta = self.cn_ipv4_file.with_suffix(self.cn_ipv4_file.suffix + ".meta.json")
+        self.geosite_meta = self.geosite_file.with_suffix(self.geosite_file.suffix + ".meta.json")
         
         # 确保目录存在
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -58,6 +73,36 @@ class DataManager:
         fallback = Path(tempfile.gettempdir()) / "rule-bot"
         fallback.mkdir(parents=True, exist_ok=True)
         return fallback
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        if self._session and not self._session.closed:
+            return self._session
+        connector = aiohttp.TCPConnector(
+            limit=4,
+            limit_per_host=2,
+            ttl_dns_cache=300,
+            use_dns_cache=True
+        )
+        self._session = aiohttp.ClientSession(
+            connector=connector,
+            timeout=aiohttp.ClientTimeout(total=60, connect=10)
+        )
+        return self._session
+
+    async def close(self):
+        """关闭后台任务与共享 Session"""
+        if self._scheduler_task and not self._scheduler_task.done():
+            self._scheduler_task.cancel()
+            try:
+                await self._scheduler_task
+            except asyncio.CancelledError:
+                # 预期中的异常：关闭时取消后台调度任务，无需向上传播
+                logger.debug("后台调度任务在关闭过程中被取消")
+        self._scheduler_task = None
+
+        if self._session and not self._session.closed:
+            await self._session.close()
+        self._session = None
     
     async def initialize(self):
         """初始化数据管理器"""
@@ -91,20 +136,26 @@ class DataManager:
                 self.config.DATA_UPDATE_INTERVAL
             )
             
+            geoip_changed = False
+            cn_ipv4_changed = False
+            geosite_changed = False
+
             if need_geoip:
                 logger.info("下载 GeoIP 数据...")
-                await self._download_geoip()
+                geoip_changed = await self._download_geoip()
             
             if need_cn_ipv4:
                 logger.info("下载中国 IPv4 CIDR 数据...")
-                await self._download_cn_ipv4()
+                cn_ipv4_changed = await self._download_cn_ipv4()
 
             if need_geosite:
                 logger.info("下载 GeoSite 数据...")
-                await self._download_geosite()
+                geosite_changed = await self._download_geosite()
             
             # 加载 GeoSite 数据到内存
-            await self._load_geosite_data()
+            await self._load_geosite_data(force=True)
+            if geosite_changed or geoip_changed or cn_ipv4_changed:
+                trim_memory("初始化后内存修剪")
             
         except Exception as e:
             logger.error(f"初始数据下载失败: {e}")
@@ -113,10 +164,11 @@ class DataManager:
     async def _download_geoip(self):
         """下载 GeoIP 数据"""
         try:
-            await self._download_with_fallback(
+            return await self._download_with_fallback(
                 self.config.GEOIP_URLS,
                 self.geoip_file,
-                "GeoIP"
+                "geoip",
+                self.geoip_meta
             )
         except Exception as e:
             logger.error(f"GeoIP 数据下载失败: {e}")
@@ -125,10 +177,11 @@ class DataManager:
     async def _download_cn_ipv4(self):
         """下载中国 IPv4 CIDR 数据"""
         try:
-            await self._download_with_fallback(
+            return await self._download_with_fallback(
                 self.config.CN_IPV4_URLS,
                 self.cn_ipv4_file,
-                "中国 IPv4 CIDR"
+                "cn_ipv4",
+                self.cn_ipv4_meta
             )
         except Exception as e:
             logger.error(f"中国 IPv4 CIDR 数据下载失败: {e}")
@@ -137,24 +190,31 @@ class DataManager:
     async def _download_geosite(self):
         """下载 GeoSite 数据"""
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(self.config.GEOSITE_URL) as response:
-                    if response.status == 200:
-                        with open(self.geosite_file, 'wb') as f:
-                            async for chunk in response.content.iter_chunked(8192):
-                                f.write(chunk)
-                        logger.info("GeoSite 数据下载完成")
-                    else:
-                        raise Exception(f"下载失败，状态码: {response.status}")
+            return await self._download_with_fallback(
+                [self.config.GEOSITE_URL],
+                self.geosite_file,
+                "geosite",
+                self.geosite_meta
+            )
         except Exception as e:
             logger.error(f"GeoSite 数据下载失败: {e}")
             raise
     
-    async def _load_geosite_data(self):
+    async def _load_geosite_data(self, force: bool = False):
         """加载 GeoSite 数据到内存"""
         try:
             if not self.geosite_file.exists():
                 logger.warning("GeoSite 文件不存在，跳过加载")
+                return
+
+            try:
+                stat = self.geosite_file.stat()
+                stamp = (int(stat.st_mtime_ns), int(stat.st_size))
+            except Exception:
+                stamp = None
+
+            if not force and stamp and self._geosite_stamp == stamp:
+                logger.info("GeoSite 文件未变化，跳过加载")
                 return
             
             logger.info("加载 GeoSite 数据到内存...")
@@ -202,6 +262,9 @@ class DataManager:
                 self.geosite_keywords = keywords
                 self.geosite_regex_patterns = regex_patterns
                 self.geosite_includes = includes
+                if stamp:
+                    self._geosite_stamp = stamp
+                self._geosite_cache.clear()
             
             logger.info(
                 "GeoSite 数据加载完成，域名: {}, 关键字: {}, 正则: {}, include: {}",
@@ -224,6 +287,12 @@ class DataManager:
             if not domain:
                 return False
 
+            cached = self._geosite_cache.get(domain)
+            if cached is not None:
+                METRICS.inc("geosite.cache.hit")
+                return cached
+            METRICS.inc("geosite.cache.miss")
+
             with self._data_lock:
                 domain_set = self.geosite_domains
                 keywords = self.geosite_keywords
@@ -231,6 +300,7 @@ class DataManager:
             
             # 1. 直接检查完整域名
             if domain in domain_set:
+                self._geosite_cache.set(domain, True)
                 return True
             
             # 2. 检查是否为 GeoSite 中域名的子域名
@@ -239,18 +309,22 @@ class DataManager:
             for i in range(1, len(parts)):
                 parent_domain = '.'.join(parts[i:])
                 if parent_domain in domain_set:
+                    self._geosite_cache.set(domain, True)
                     return True
 
             for keyword in keywords:
                 if keyword and keyword in domain:
+                    self._geosite_cache.set(domain, True)
                     return True
 
             for pattern in regex_patterns:
                 if pattern.search(domain):
+                    self._geosite_cache.set(domain, True)
                     return True
             
             # 注意：不做反向检查，因为 GeoSite 通常只包含具体域名，不需要检查子域名覆盖父域名的情况
             
+            self._geosite_cache.set(domain, False)
             return False
             
         except Exception as e:
@@ -267,26 +341,33 @@ class DataManager:
     
     def _start_scheduled_updates(self):
         """启动定时更新任务"""
-        def run_scheduler():
-            update_interval = self.config.DATA_UPDATE_INTERVAL
-            while True:
-                time.sleep(update_interval)
-                self._update_data_sync()
-        
-        # 在单独线程中运行调度器
-        scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-        scheduler_thread.start()
+        if self._scheduler_task and not self._scheduler_task.done():
+            logger.info("定时更新任务已在运行")
+            return
+        self._scheduler_task = asyncio.create_task(self._scheduled_update_loop())
         logger.info("定时更新任务已启动")
-    
-    def _update_data_sync(self):
-        """同步版本的数据更新（用于scheduler）"""
+
+    async def _scheduled_update_loop(self):
+        """异步定时更新循环（与主事件循环一致）"""
+        update_interval = self.config.DATA_UPDATE_INTERVAL
+        while True:
+            try:
+                await asyncio.sleep(update_interval)
+                await self._update_data_guarded()
+            except asyncio.CancelledError:
+                logger.info("定时更新任务已停止")
+                raise
+            except Exception as e:
+                logger.error(f"定时更新循环异常: {e}")
+                await asyncio.sleep(1)
+
+    async def _update_data_guarded(self):
+        """带并发保护的数据更新"""
         if not self._update_lock.acquire(blocking=False):
             logger.info("已有更新任务在执行，跳过本次更新")
             return
         try:
-            asyncio.run(self._update_data())
-        except Exception as e:
-            logger.error(f"同步更新执行失败: {e}")
+            await self._update_data()
         finally:
             self._update_lock.release()
     
@@ -296,34 +377,120 @@ class DataManager:
             logger.info("开始定时更新数据...")
             
             # 下载新数据
-            await self._download_geoip()
-            await self._download_cn_ipv4()
-            await self._download_geosite()
+            geoip_changed = await self._download_geoip()
+            cn_ipv4_changed = await self._download_cn_ipv4()
+            geosite_changed = await self._download_geosite()
             
-            # 重新加载 GeoSite 数据
-            await self._load_geosite_data()
+            # 重新加载 GeoSite 数据（仅文件变化时）
+            if geosite_changed:
+                await self._load_geosite_data()
+                trim_memory("geosite 更新后内存修剪")
+            elif geoip_changed or cn_ipv4_changed:
+                trim_memory("数据更新后内存修剪")
             
             logger.info("定时更新完成")
             
         except Exception as e:
             logger.error(f"定时更新失败: {e}") 
+    
+    def _load_meta(self, meta_path: Path) -> Dict[str, Any]:
+        if not meta_path.exists():
+            return {}
+        try:
+            with meta_path.open("r", encoding="utf-8") as handle:
+                return json.load(handle)
+        except Exception:
+            return {}
 
-    async def _download_with_fallback(self, urls: List[str], dest_path: Path, label: str):
-        """按顺序尝试多个 URL 下载数据"""
+    def _save_meta(self, meta_path: Path, meta: Dict[str, Any]) -> None:
+        try:
+            meta_path.parent.mkdir(parents=True, exist_ok=True)
+            with meta_path.open("w", encoding="utf-8") as handle:
+                json.dump(meta, handle, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.debug(f"保存 meta 失败: {e}")
+
+    async def _download_with_fallback(
+        self,
+        urls: List[str],
+        dest_path: Path,
+        label: str,
+        meta_path: Path
+    ) -> bool:
+        """按顺序尝试多个 URL 下载数据，支持条件更新和变更检测"""
         last_error = None
-        async with aiohttp.ClientSession() as session:
-            for url in urls:
-                try:
-                    async with session.get(url) as response:
-                        if response.status == 200:
-                            with open(dest_path, 'wb') as f:
-                                async for chunk in response.content.iter_chunked(8192):
-                                    f.write(chunk)
-                            logger.info("{} 数据下载完成: {}", label, url)
-                            return
+        session = await self._get_session()
+        current_meta = self._load_meta(meta_path)
+        conditional_headers = {}
+        if current_meta.get("etag"):
+            conditional_headers["If-None-Match"] = current_meta["etag"]
+        if current_meta.get("last_modified"):
+            conditional_headers["If-Modified-Since"] = current_meta["last_modified"]
+
+        for idx, url in enumerate(urls):
+            try:
+                # 仅在首选源使用条件请求头，避免不同镜像之间复用 ETag/Last-Modified。
+                headers = conditional_headers if idx == 0 else {}
+                start_ts = time.perf_counter()
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 304:
+                        logger.info("{} 数据未更新（304）: {}", label, url)
+                        METRICS.record_request(
+                            f"data.download.{label}",
+                            (time.perf_counter() - start_ts) * 1000,
+                            success=True
+                        )
+                        return False
+                    if response.status != 200:
                         last_error = f"下载失败，状态码: {response.status}"
                         logger.warning("{} 数据下载失败: {} (状态码: {})", label, url, response.status)
-                except Exception as e:
-                    last_error = str(e)
-                    logger.warning("{} 数据下载失败: {} ({})", label, url, e)
+                        continue
+
+                    tmp_path = dest_path.with_suffix(dest_path.suffix + ".tmp")
+                    digest = hashlib.sha256()
+                    size = 0
+                    with tmp_path.open("wb") as handle:
+                        async for chunk in response.content.iter_chunked(8192):
+                            handle.write(chunk)
+                            digest.update(chunk)
+                            size += len(chunk)
+
+                    new_hash = digest.hexdigest()
+                    old_hash = current_meta.get("sha256")
+                    changed = True
+                    if dest_path.exists() and old_hash and old_hash == new_hash:
+                        changed = False
+                        tmp_path.unlink(missing_ok=True)
+                    else:
+                        tmp_path.replace(dest_path)
+
+                    meta = {
+                        "etag": response.headers.get("ETag"),
+                        "last_modified": response.headers.get("Last-Modified"),
+                        "sha256": new_hash,
+                        "size": size,
+                        "updated_at": datetime.utcnow().isoformat() + "Z",
+                        "source": url
+                    }
+                    self._save_meta(meta_path, meta)
+
+                    if changed:
+                        logger.info("{} 数据下载完成: {}", label, url)
+                    else:
+                        logger.info("{} 数据未变化（hash 相同）: {}", label, url)
+                    METRICS.record_request(
+                        f"data.download.{label}",
+                        (time.perf_counter() - start_ts) * 1000,
+                        success=True
+                    )
+                    return changed
+            except Exception as e:
+                last_error = str(e)
+                logger.warning("{} 数据下载失败: {} ({})", label, url, e)
+
+        METRICS.record_request(
+            f"data.download.{label}",
+            0.0,
+            success=False
+        )
         raise Exception(f"{label} 数据下载失败: {last_error or '所有地址不可用'}")

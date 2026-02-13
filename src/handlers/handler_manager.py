@@ -30,10 +30,24 @@ class HandlerManager:
         self.data_manager = data_manager
         
         # 初始化服务
-        self.dns_service = DNSService(config.DOH_SERVERS, config.NS_DOH_SERVERS)
+        self.dns_service = DNSService(
+            config.DOH_SERVERS,
+            config.NS_DOH_SERVERS,
+            cache_size=config.DNS_CACHE_SIZE,
+            cache_ttl=config.DNS_CACHE_TTL,
+            ns_cache_size=config.NS_CACHE_SIZE,
+            ns_cache_ttl=config.NS_CACHE_TTL,
+            max_concurrency=config.DNS_MAX_CONCURRENCY,
+            conn_limit=config.DNS_CONN_LIMIT,
+            conn_limit_per_host=config.DNS_CONN_LIMIT_PER_HOST,
+            timeout_total=config.DNS_TIMEOUT_TOTAL,
+            timeout_connect=config.DNS_TIMEOUT_CONNECT,
+        )
         self.geoip_service = GeoIPService(
             str(data_manager.geoip_file),
-            str(data_manager.cn_ipv4_file)
+            str(data_manager.cn_ipv4_file),
+            cache_size=config.GEOIP_CACHE_SIZE,
+            cache_ttl=config.GEOIP_CACHE_TTL
         )
         self.github_service = GitHubService(config)
         self.domain_checker = DomainChecker(self.dns_service, self.geoip_service)
@@ -53,6 +67,7 @@ class HandlerManager:
         
         # 用户限制管理
         self.user_add_history: Dict[int, list] = defaultdict(list)  # 用户添加历史 {user_id: [timestamp1, timestamp2, ...]}
+        self._last_history_cleanup = 0
         self.MAX_DESCRIPTION_LENGTH = 20  # 域名说明最大字符数
         self.MAX_ADDS_PER_HOUR = 50  # 每小时最多添加域名数
         self.MAX_DETAIL_LINES = 6  # 检查详情最大行数
@@ -178,6 +193,7 @@ class HandlerManager:
         Returns:
             tuple: (是否可以添加, 剩余次数)
         """
+        self._maybe_cleanup_user_history()
         current_time = time.time()
         one_hour_ago = current_time - 3600  # 1小时前的时间戳
         
@@ -192,6 +208,19 @@ class HandlerManager:
         remaining = self.MAX_ADDS_PER_HOUR - current_count
         
         return current_count < self.MAX_ADDS_PER_HOUR, remaining
+
+    def _maybe_cleanup_user_history(self) -> None:
+        now = time.time()
+        if now - self._last_history_cleanup < 600:
+            return
+        cutoff = now - 3600
+        for uid, timestamps in list(self.user_add_history.items()):
+            filtered = [ts for ts in timestamps if ts > cutoff]
+            if filtered:
+                self.user_add_history[uid] = filtered
+            else:
+                self.user_add_history.pop(uid, None)
+        self._last_history_cleanup = now
     
     def record_user_add(self, user_id: int):
         """记录用户添加操作"""

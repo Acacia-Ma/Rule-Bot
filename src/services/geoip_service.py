@@ -21,12 +21,21 @@ except ImportError:
 class GeoIPService:
     """GeoIP 服务"""
     
-    def __init__(self, geoip_file_path: str, cn_ipv4_file_path: Optional[str] = None):
+    def __init__(
+        self,
+        geoip_file_path: str,
+        cn_ipv4_file_path: Optional[str] = None,
+        cache_size: int = 4096,
+        cache_ttl: int = 21600
+    ):
         self.geoip_file = Path(geoip_file_path)
         self.cn_ipv4_file = Path(cn_ipv4_file_path) if cn_ipv4_file_path else None
         self.reader = None
         self._cn_ipv4_ranges = []
         self._cn_ipv4_range_starts = []
+        self._cache_size = cache_size
+        self._cache_ttl = cache_ttl
+        self._location_cache = None
         self._load_data()
     
     def _load_data(self):
@@ -42,15 +51,31 @@ class GeoIPService:
                 logger.info(f"GeoIP 数据库加载成功: {self.geoip_file}")
 
             self._load_cn_ipv4()
+            self._init_cache()
             
         except Exception as e:
             logger.error(f"加载 GeoIP 数据失败: {e}")
+
+    def _init_cache(self):
+        try:
+            if self._cache_size <= 0 or self._cache_ttl <= 0:
+                self._location_cache = None
+                return
+            from ..utils.cache import TTLCache
+            self._location_cache = TTLCache(self._cache_size, self._cache_ttl)
+        except Exception:
+            self._location_cache = None
     
     def get_country_code(self, ip: str) -> Optional[str]:
         """获取 IP 的国家代码"""
         try:
             # 验证 IP 格式
             socket.inet_aton(ip)
+
+            if self._location_cache:
+                cached = self._location_cache.get(ip)
+                if cached is not None:
+                    return cached.get("country_code")
             
             # 如果有真实的 GeoIP2 数据库
             if self.reader:
@@ -144,6 +169,10 @@ class GeoIPService:
     def get_location_info(self, ip: str) -> Dict[str, Any]:
         """获取 IP 的详细位置信息"""
         try:
+            if self._location_cache:
+                cached = self._location_cache.get(ip)
+                if cached is not None:
+                    return cached
             country_code = self.get_country_code(ip)
             
             # 如果使用真实数据库且找到结果
@@ -152,12 +181,15 @@ class GeoIPService:
                     response = self.reader.country(ip)
                     country_name = response.country.names.get('zh-CN') or response.country.name or "未知"
                     
-                    return {
+                    result = {
                         "ip": ip,
                         "country_code": country_code,
                         "country_name": country_name,
                         "is_china": country_code == "CN"
                     }
+                    if self._location_cache:
+                        self._location_cache.set(ip, result)
+                    return result
                 except Exception:
                     pass
             
@@ -175,21 +207,27 @@ class GeoIPService:
                 "FR": "法国",
             }
             
-            return {
+            result = {
                 "ip": ip,
                 "country_code": country_code,
                 "country_name": country_names.get(country_code, "未知" if country_code else "未知"),
                 "is_china": country_code == "CN" if country_code else False
             }
+            if self._location_cache:
+                self._location_cache.set(ip, result)
+            return result
             
         except Exception as e:
             logger.error(f"获取 IP 位置信息失败: {e}")
-            return {
+            result = {
                 "ip": ip,
                 "country_code": None,
                 "country_name": "未知",
                 "is_china": False
             }
+            if self._location_cache:
+                self._location_cache.set(ip, result)
+            return result
     
     def __del__(self):
         """关闭数据库连接"""

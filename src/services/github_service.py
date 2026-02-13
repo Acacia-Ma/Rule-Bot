@@ -5,12 +5,16 @@ GitHub 服务模块
 
 import asyncio
 import base64
+import io
+import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from loguru import logger
 from github import Github, GithubException, InputGitAuthor
 
 from ..config import Config
+from ..utils.cache import TTLCache
+from ..utils.metrics import METRICS
 
 
 class GitHubService:
@@ -20,6 +24,10 @@ class GitHubService:
         self.config = config
         self.github = Github(config.GITHUB_TOKEN)
         self.repo = None
+        self._file_cache = TTLCache(
+            getattr(config, "GITHUB_FILE_CACHE_SIZE", 0),
+            getattr(config, "GITHUB_FILE_CACHE_TTL", 0)
+        )
         self._initialize_repo()
     
     def _initialize_repo(self):
@@ -80,37 +88,69 @@ class GitHubService:
                 "error": str(e)
             }
     
-    async def get_rule_file_content(self, file_path: str) -> Optional[str]:
+    async def get_rule_file_content(self, file_path: str, use_cache: bool = True) -> Optional[str]:
         """获取规则文件内容"""
         try:
             logger.debug(f"正在获取文件内容: {file_path}")
+            if use_cache:
+                cached = self._file_cache.get(file_path)
+                if cached and "content" in cached:
+                    METRICS.inc("github.cache.hit")
+                    return cached["content"]
+                METRICS.inc("github.cache.miss")
+
+            start_ts = time.perf_counter()
             # 使用 asyncio.to_thread 在线程池中执行阻塞IO
             file_content = await asyncio.to_thread(self.repo.get_contents, file_path)
             content = base64.b64decode(file_content.content).decode('utf-8')
+            self._file_cache.set(file_path, {"content": content, "sha": getattr(file_content, "sha", None)})
+            METRICS.record_request(
+                "github.get_contents",
+                (time.perf_counter() - start_ts) * 1000,
+                success=True
+            )
             logger.debug(f"成功获取文件内容: {file_path}, 长度: {len(content)} 字符")
             return content
         except GithubException as e:
             logger.error(f"GitHub API 获取文件失败: {file_path}, status={getattr(e, 'status', 'unknown')}, message={getattr(e, 'data', {}).get('message', str(e))}")
+            METRICS.record_request("github.get_contents", 0.0, success=False)
             return None
         except Exception as e:
             logger.error(f"获取文件内容失败: {file_path}, {type(e).__name__}: {e}", exc_info=True)
+            METRICS.record_request("github.get_contents", 0.0, success=False)
             return None
 
-    async def get_rule_file_data(self, file_path: str) -> Optional[Dict[str, Any]]:
+    async def get_rule_file_data(self, file_path: str, use_cache: bool = True) -> Optional[Dict[str, Any]]:
         """获取规则文件内容和 SHA"""
         try:
             logger.debug(f"正在获取文件内容和 SHA: {file_path}")
+            if use_cache:
+                cached = self._file_cache.get(file_path)
+                if cached and "content" in cached and cached.get("sha"):
+                    METRICS.inc("github.cache.hit")
+                    return {"content": cached["content"], "sha": cached["sha"]}
+                METRICS.inc("github.cache.miss")
+
+            start_ts = time.perf_counter()
             file_content = await asyncio.to_thread(self.repo.get_contents, file_path)
             content = base64.b64decode(file_content.content).decode('utf-8')
+            self._file_cache.set(file_path, {"content": content, "sha": file_content.sha})
+            METRICS.record_request(
+                "github.get_contents",
+                (time.perf_counter() - start_ts) * 1000,
+                success=True
+            )
             return {"content": content, "sha": file_content.sha}
         except GithubException as e:
             logger.error(
                 f"GitHub API 获取文件失败: {file_path}, status={getattr(e, 'status', 'unknown')}, "
                 f"message={getattr(e, 'data', {}).get('message', str(e))}"
             )
+            METRICS.record_request("github.get_contents", 0.0, success=False)
             return None
         except Exception as e:
             logger.error(f"获取文件内容和 SHA 失败: {file_path}, {type(e).__name__}: {e}", exc_info=True)
+            METRICS.record_request("github.get_contents", 0.0, success=False)
             return None
     
     async def check_domain_in_rules(self, domain: str, file_path: str = None) -> Dict[str, Any]:
@@ -125,11 +165,10 @@ class GitHubService:
             
             # CPU密集型操作也在线程池中执行，避免阻塞事件循环
             def _process_content():
-                lines = content.split('\n')
                 domain_lower = domain.lower()
                 found_rules = []
                 
-                for line_num, line in enumerate(lines, 1):
+                for line_num, line in enumerate(io.StringIO(content), 1):
                     line = line.strip()
                     if line and not line.startswith('#'):
                         # 检查 DOMAIN-SUFFIX 格式
@@ -149,7 +188,13 @@ class GitHubService:
                                 })
                 return found_rules
 
+            start_ts = time.perf_counter()
             found_rules = await asyncio.to_thread(_process_content)
+            METRICS.record_request(
+                "github.check_rules",
+                (time.perf_counter() - start_ts) * 1000,
+                success=True
+            )
             
             return {
                 "exists": len(found_rules) > 0,
@@ -159,6 +204,7 @@ class GitHubService:
             
         except Exception as e:
             logger.error(f"检查域名规则失败: {e}")
+            METRICS.record_request("github.check_rules", 0.0, success=False)
             return {"exists": False, "error": str(e)}
     
     async def add_domain_to_rules(
@@ -187,7 +233,7 @@ class GitHubService:
             for attempt in range(1, max_retries + 1):
                 # 获取当前文件内容和 SHA
                 logger.debug(f"开始添加域名 {domain} 到文件 {file_path} (尝试 {attempt}/{max_retries})")
-                file_data = await self.get_rule_file_data(file_path)
+                file_data = await self.get_rule_file_data(file_path, use_cache=(attempt == 1))
                 if not file_data:
                     error_msg = f"无法获取规则文件内容: {file_path}。请检查文件是否存在，仓库访问权限是否正确。"
                     logger.error(error_msg)
@@ -292,8 +338,15 @@ class GitHubService:
                     )
 
                 try:
+                    start_ts = time.perf_counter()
                     commit_result = await asyncio.to_thread(_perform_commit)
+                    METRICS.record_request(
+                        "github.update_file",
+                        (time.perf_counter() - start_ts) * 1000,
+                        success=True
+                    )
                 except GithubException as e:
+                    METRICS.record_request("github.update_file", 0.0, success=False)
                     if getattr(e, "status", None) == 409 and attempt < max_retries:
                         logger.warning("GitHub 更新冲突，准备重试")
                         await asyncio.sleep(0.5 * attempt)
@@ -305,6 +358,7 @@ class GitHubService:
                 commit_url = f"https://github.com/{self.config.GITHUB_REPO}/commit/{commit_sha}"
                 
                 logger.info(f"成功添加域名 {domain} 到规则文件，commit: {commit_sha}")
+                self._file_cache.pop(file_path)
                 
                 return {
                     "success": True,
@@ -340,7 +394,7 @@ class GitHubService:
 
             max_retries = 3
             for attempt in range(1, max_retries + 1):
-                file_data = await self.get_rule_file_data(file_path)
+                file_data = await self.get_rule_file_data(file_path, use_cache=(attempt == 1))
                 if not file_data:
                     return {"success": False, "error": "无法获取文件内容"}
 
@@ -407,8 +461,15 @@ class GitHubService:
                     )
 
                 try:
+                    start_ts = time.perf_counter()
                     commit_result = await asyncio.to_thread(_perform_commit)
+                    METRICS.record_request(
+                        "github.update_file",
+                        (time.perf_counter() - start_ts) * 1000,
+                        success=True
+                    )
                 except GithubException as e:
+                    METRICS.record_request("github.update_file", 0.0, success=False)
                     if getattr(e, "status", None) == 409 and attempt < max_retries:
                         logger.warning("GitHub 更新冲突，准备重试")
                         await asyncio.sleep(0.5 * attempt)
@@ -420,6 +481,7 @@ class GitHubService:
                 commit_url = f"https://github.com/{self.config.GITHUB_REPO}/commit/{commit_sha}"
                 
                 logger.info(f"成功删除域名 {domain} 从规则文件，commit: {commit_sha}")
+                self._file_cache.pop(file_path)
                 
                 return {
                     "success": True,
@@ -449,11 +511,12 @@ class GitHubService:
             if not content:
                 return {"error": "无法获取文件内容"}
             
-            lines = content.split('\n')
             rule_count = 0
             comment_count = 0
+            total_lines = 0
             
-            for line in lines:
+            for line in io.StringIO(content):
+                total_lines += 1
                 line = line.strip()
                 if line:
                     if line.startswith('#'):
@@ -463,7 +526,7 @@ class GitHubService:
             
             return {
                 "file_path": file_path,
-                "total_lines": len(lines),
+                "total_lines": total_lines,
                 "rule_count": rule_count,
                 "comment_count": comment_count
             }
