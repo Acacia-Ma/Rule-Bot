@@ -96,7 +96,8 @@ class DataManager:
             try:
                 await self._scheduler_task
             except asyncio.CancelledError:
-                pass
+                # 预期中的异常：关闭时取消后台调度任务，无需向上传播
+                logger.debug("后台调度任务在关闭过程中被取消")
         self._scheduler_task = None
 
         if self._session and not self._session.closed:
