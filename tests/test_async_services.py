@@ -36,6 +36,7 @@ class TestServices(unittest.IsolatedAsyncioTestCase):
         config.GITHUB_COMMIT_NAME = "Rule-Bot"
         config.GITHUB_COMMIT_EMAIL = "noreply@users.noreply.github.com"
         config.DIRECT_RULE_FILE = "rule.list"
+        config.GITHUB_BRANCH = "release"
 
         with patch.object(GitHubService, "_initialize_repo"):
             service = GitHubService(config)
@@ -52,6 +53,7 @@ class TestServices(unittest.IsolatedAsyncioTestCase):
         # Test async get_rule_file_content
         content = await service.get_rule_file_content("test.txt")
         self.assertEqual(content, file_content_str)
+        service.repo.get_contents.assert_called_once_with("test.txt", ref="release")
         print(f"Async get_rule_file_content returned correct content: {content}")
         
     async def test_github_service_add_domain_wrapper(self):
@@ -62,6 +64,7 @@ class TestServices(unittest.IsolatedAsyncioTestCase):
         config.GITHUB_REPO = "test/repo"
         config.GITHUB_COMMIT_NAME = "bot"
         config.GITHUB_COMMIT_EMAIL = "bot@test.com"
+        config.GITHUB_BRANCH = "dev"
         
         with patch.object(GitHubService, "_initialize_repo"):
             service = GitHubService(config)
@@ -85,6 +88,8 @@ class TestServices(unittest.IsolatedAsyncioTestCase):
         
         self.assertTrue(result["success"])
         self.assertEqual(result["commit_sha"], "new_sha")
+        self.assertEqual(service.repo.get_contents.call_args.kwargs.get("ref"), "dev")
+        self.assertEqual(service.repo.update_file.call_args.kwargs.get("branch"), "dev")
         print("Async add_domain_to_rules executed successfully.")
 
 if __name__ == '__main__':

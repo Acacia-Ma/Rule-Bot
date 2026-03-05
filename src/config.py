@@ -18,6 +18,7 @@ class Config:
         # GitHub配置
         self.GITHUB_TOKEN = self._get_env_required("GITHUB_TOKEN")
         self.GITHUB_REPO = self._get_env_required("GITHUB_REPO")
+        self.GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "").strip()  # 可选，默认使用仓库默认分支
         # 强制使用Rule-Bot身份，只允许自定义邮箱
         self.GITHUB_COMMIT_NAME = "Rule-Bot"
         self.GITHUB_COMMIT_EMAIL = os.getenv("GITHUB_COMMIT_EMAIL", "noreply@users.noreply.github.com")

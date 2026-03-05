@@ -77,6 +77,7 @@ vim docker-compose.yml
 - `GITHUB_TOKEN`
 - `GITHUB_REPO`
 - `DIRECT_RULE_FILE`
+- `GITHUB_BRANCH`（可选，不填则使用仓库默认分支）
 
 1) 启动容器
 
@@ -98,6 +99,7 @@ docker compose logs -f rule-bot
 - `GITHUB_TOKEN`：需要 `repo` 权限（见“准备工作”）
 - `GITHUB_REPO`：格式 `用户名/仓库名`
 - `DIRECT_RULE_FILE`：规则文件路径（仓库内）
+- `GITHUB_BRANCH`：目标分支（可选，不填则使用仓库默认分支）
 
 ### 可选参数（展开查看）
 
@@ -107,6 +109,7 @@ docker compose logs -f rule-bot
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
 | `PROXY_RULE_FILE` | 代理规则文件（暂不使用） | 空 |
+| `GITHUB_BRANCH` | GitHub 目标分支（读写规则文件） | 空（默认分支） |
 | `GITHUB_COMMIT_EMAIL` | 提交邮箱 | `noreply@users.noreply.github.com` |
 | `LOG_LEVEL` | 日志级别：`DEBUG/INFO/WARNING/ERROR` | `INFO` |
 | `LOG_FORMAT` | 日志格式：`compact/verbose` | `compact` |
