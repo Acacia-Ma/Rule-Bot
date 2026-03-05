@@ -1,6 +1,6 @@
 # Rule-Bot
 
-一个用于管理 Clash 规则的 Telegram 机器人，支持域名查询与直连规则添加。
+一个用于管理 Mihomo 规则的 Telegram 机器人，支持域名查询与直连规则添加。
 
 - ✅ 自动检查 GitHub 规则与 GEOSITE:CN
 - ✅ DNS / NS 归属地判断，给出添加建议
