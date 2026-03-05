@@ -29,12 +29,36 @@ class GitHubService:
             getattr(config, "GITHUB_FILE_CACHE_TTL", 0)
         )
         self._initialize_repo()
+
+    def _target_branch(self) -> Optional[str]:
+        branch = getattr(self.config, "GITHUB_BRANCH", "")
+        if isinstance(branch, str):
+            branch = branch.strip()
+        return branch or None
+
+    def _cache_key(self, file_path: str) -> str:
+        branch = self._target_branch()
+        if branch:
+            return f"{branch}:{file_path}"
+        return file_path
+
+    def _get_contents_kwargs(self) -> Dict[str, str]:
+        branch = self._target_branch()
+        return {"ref": branch} if branch else {}
+
+    def _update_file_kwargs(self) -> Dict[str, str]:
+        branch = self._target_branch()
+        return {"branch": branch} if branch else {}
     
     def _initialize_repo(self):
         """初始化仓库连接"""
         try:
             self.repo = self.github.get_repo(self.config.GITHUB_REPO)
-            logger.info(f"成功连接到 GitHub 仓库: {self.config.GITHUB_REPO}")
+            branch = self._target_branch()
+            if branch:
+                logger.info(f"成功连接到 GitHub 仓库: {self.config.GITHUB_REPO} (目标分支: {branch})")
+            else:
+                logger.info(f"成功连接到 GitHub 仓库: {self.config.GITHUB_REPO} (目标分支: 默认分支)")
         except Exception as e:
             logger.error(f"连接 GitHub 仓库失败: {e}")
     
@@ -63,13 +87,17 @@ class GitHubService:
             
             # 测试文件访问
             try:
-                file_content = self.repo.get_contents(self.config.DIRECT_RULE_FILE)
+                file_content = self.repo.get_contents(
+                    self.config.DIRECT_RULE_FILE,
+                    **self._get_contents_kwargs()
+                )
                 logger.info(f"规则文件访问测试成功: {self.config.DIRECT_RULE_FILE}")
                 return {
                     "success": True,
                     "user": user.login,
                     "repo": repo_info,
-                    "file_accessible": True
+                    "file_accessible": True,
+                    "target_branch": self._target_branch() or self.repo.default_branch
                 }
             except Exception as file_error:
                 logger.warning(f"规则文件访问失败: {file_error}")
@@ -92,8 +120,9 @@ class GitHubService:
         """获取规则文件内容"""
         try:
             logger.debug(f"正在获取文件内容: {file_path}")
+            cache_key = self._cache_key(file_path)
             if use_cache:
-                cached = self._file_cache.get(file_path)
+                cached = self._file_cache.get(cache_key)
                 if cached and "content" in cached:
                     METRICS.inc("github.cache.hit")
                     return cached["content"]
@@ -101,9 +130,13 @@ class GitHubService:
 
             start_ts = time.perf_counter()
             # 使用 asyncio.to_thread 在线程池中执行阻塞IO
-            file_content = await asyncio.to_thread(self.repo.get_contents, file_path)
+            file_content = await asyncio.to_thread(
+                self.repo.get_contents,
+                file_path,
+                **self._get_contents_kwargs()
+            )
             content = base64.b64decode(file_content.content).decode('utf-8')
-            self._file_cache.set(file_path, {"content": content, "sha": getattr(file_content, "sha", None)})
+            self._file_cache.set(cache_key, {"content": content, "sha": getattr(file_content, "sha", None)})
             METRICS.record_request(
                 "github.get_contents",
                 (time.perf_counter() - start_ts) * 1000,
@@ -124,17 +157,22 @@ class GitHubService:
         """获取规则文件内容和 SHA"""
         try:
             logger.debug(f"正在获取文件内容和 SHA: {file_path}")
+            cache_key = self._cache_key(file_path)
             if use_cache:
-                cached = self._file_cache.get(file_path)
+                cached = self._file_cache.get(cache_key)
                 if cached and "content" in cached and cached.get("sha"):
                     METRICS.inc("github.cache.hit")
                     return {"content": cached["content"], "sha": cached["sha"]}
                 METRICS.inc("github.cache.miss")
 
             start_ts = time.perf_counter()
-            file_content = await asyncio.to_thread(self.repo.get_contents, file_path)
+            file_content = await asyncio.to_thread(
+                self.repo.get_contents,
+                file_path,
+                **self._get_contents_kwargs()
+            )
             content = base64.b64decode(file_content.content).decode('utf-8')
-            self._file_cache.set(file_path, {"content": content, "sha": file_content.sha})
+            self._file_cache.set(cache_key, {"content": content, "sha": file_content.sha})
             METRICS.record_request(
                 "github.get_contents",
                 (time.perf_counter() - start_ts) * 1000,
@@ -334,7 +372,8 @@ class GitHubService:
                         committer=InputGitAuthor(
                             name=self.config.GITHUB_COMMIT_NAME,
                             email=self.config.GITHUB_COMMIT_EMAIL
-                        )
+                        ),
+                        **self._update_file_kwargs()
                     )
 
                 try:
@@ -358,7 +397,7 @@ class GitHubService:
                 commit_url = f"https://github.com/{self.config.GITHUB_REPO}/commit/{commit_sha}"
                 
                 logger.info(f"成功添加域名 {domain} 到规则文件，commit: {commit_sha}")
-                self._file_cache.pop(file_path)
+                self._file_cache.pop(self._cache_key(file_path))
                 
                 return {
                     "success": True,
@@ -457,7 +496,8 @@ class GitHubService:
                         committer=InputGitAuthor(
                             name=self.config.GITHUB_COMMIT_NAME,
                             email=self.config.GITHUB_COMMIT_EMAIL
-                        )
+                        ),
+                        **self._update_file_kwargs()
                     )
 
                 try:
@@ -481,7 +521,7 @@ class GitHubService:
                 commit_url = f"https://github.com/{self.config.GITHUB_REPO}/commit/{commit_sha}"
                 
                 logger.info(f"成功删除域名 {domain} 从规则文件，commit: {commit_sha}")
-                self._file_cache.pop(file_path)
+                self._file_cache.pop(self._cache_key(file_path))
                 
                 return {
                     "success": True,
